@@ -26,6 +26,7 @@ class Voter(mesa.Agent):
         """
         Returns the nearest candidate to the Voter.
         """
+        pass
 
 
 class Candidate(mesa.Agent):
@@ -42,7 +43,7 @@ class Candidate(mesa.Agent):
         self.opinion = np.zeroes(2)
 
         # number of votes this candidate has, initialized to 0
-        self.votes = 0
+        self.num_votes = 0
 
 
     def step(self):
@@ -65,6 +66,7 @@ class ElectionSystem(mesa.Model):
         self.num_candidates = num_candidates
         self.schedule = mesa.time.RandomActivation(self)
         self.grid = mesa.space.MultiGrid(width=width, height=height, torus=True)
+        self.winner = None
 
         # initialize voters
         for i in range(self.num_voters):
