@@ -1,99 +1,165 @@
 import mesa
 import numpy as np
+import math
 
 class Voter(mesa.Agent):
     """
-    An agent representing the behaviour of a voter.
+    An agent representing the behavior of a voter.
+
+    uid: the unique ID of the voter
+    opinion: the array representing the voter's opinions as well as their position
+    voted_for: who the candidate voted for
     """
 
-    def __init__(self, unique_id, model):
-        self.unique_id = unique_id
-        super().__init__(unique_id, model)
-
-        # 2d vector representing the opinion of the voter
-        self.opinion = np.zeroes(2)
+    def __init__(self, uid, model):
+        super().__init__(uid, model)
+        self.type = 'voter'
+        self.unique_id = uid
+        self.opinion = np.zeros(2)
+        self.pos
+        self.voted_for = None
 
 
     def step(self):
         """
-        TODO: Add logic for voter to cast their vote to the nearest candidate
+        This function gets called at every time step in the model.
+        """
+        candidate = self.get_nearest_candidate()
+        self.voted_for = candidate
+        if candidate:
+            candidate.num_votes += 1
+        self.move()
+
+
+    def move(self):
+        """
         TODO: Determine how a voter moves between elections
         """
         pass
 
 
-    def nearest_candidate(self):
+    def get_nearest_candidate(self):
         """
         Returns the nearest candidate to the Voter.
         """
-        pass
+        candidates = self.model.agents[Candidate]
+        min_candidate = None
+        min_dist = math.inf
+        for candidate in candidates:
+            dist = np.linalg.norm(self.opinion - candidate.opinion)
+            if dist < min_dist:
+                min_dist = dist
+                min_candidate = candidate
+
+        return min_candidate
+
 
 
 class Candidate(mesa.Agent):
     """
-    An agent representing the behaviour of a cadndiate.
+    An agent representing the behavior of a cadndiate.
+
+    uid: the unique ID of the candidate
+    opinion: the array representing the candidate's opinions as well as their position
+    num_votes: the number of votes that candidate recieved
     """
 
 
-    def __init__(self, unique_id, model):
-        self.unique_id = unique_id
-        super().__init__(unique_id, model)
-
-        # 2d vector representing the opinion of the candidate
-        self.opinion = np.zeroes(2)
-
-        # number of votes this candidate has, initialized to 0
+    def __init__(self, uid, model):
+        super().__init__(uid, model)
+        self.type = 'candidate'
+        self.unique_id = uid
+        self.opinion = np.zeros(2)
+        self.pos
         self.num_votes = 0
 
 
     def step(self):
+        """
+        This function gets called at every time step in the model.
+        """
+        self.move()
+
+
+    def move(self):
         """
         TODO: Determine how a candidate moves between elections
         """
         pass
 
 
+
 class ElectionSystem(mesa.Model):
     """
     The model representing the plurality election system.
+
+    num_agents: total number of agents
+    num_voters: number of voting agents
+    num_candidates: number of candidate agents
+    winner: the winning candidate of the election
+    agents: all agents in model stored as a dict of {"Agent Type":[agent1, agent2, ..., agentN]}
     """
 
 
-    def __init__(self, num_voters, num_candidates, width, height):
+    def __init__(self, num_voters, num_candidates, **kwargs):
         super().__init__()
+        
+        # get key word arguments
+        width = kwargs.get('x_max', 100)
+        height = kwargs.get('y_max', 100)
+        opinions = kwargs.get('opinions', None)
+
         self.num_agents = num_voters + num_candidates
         self.num_voters = num_voters
         self.num_candidates = num_candidates
-        self.schedule = mesa.time.RandomActivation(self)
-        self.grid = mesa.space.MultiGrid(width=width, height=height, torus=True)
         self.winner = None
+        self.agents = {}
+        self.schedule = mesa.time.RandomActivation(self)
+        self.space = mesa.space.ContinuousSpace(x_max=width, y_max=height, torus=False)
 
         # initialize voters
+        self.agents[Voter] = []
         for i in range(self.num_voters):
-            agent = Voter(i, self)
-            self.schedule.add(agent)
+            voter = Voter(i, self)
+            self.schedule.add(voter)
+            self.agents[Voter].append(voter)
 
-            x = self.random.randrange(self.grid.width)
-            y = self.random.randrange(self.grid.height)
-            self.grid.place_agent(agent, (x, y))
-
-            # voter opinion is dictated by their location
-            agent.opinion = np.array([x, y])
+            # set voter opinion and location
+            if opinions: 
+                opinion = opinions[i]
+            else:
+                opinion = (self.random.randrange(self.space.width), self.random.randrange(self.space.height))
+            
+            voter.pos = opinion
+            self.space.place_agent(voter, opinion)
+            voter.opinion = np.array(opinion)
 
         # initialize candidates
-        for i in range(self.num_candidates):
-            agent = Candidate(i, self)
-            self.schedule.add(agent)
+        self.agents[Candidate] = []
+        for i in range(self.num_voters, self.num_agents):
+            candidate = Candidate(i, self)
+            self.schedule.add(candidate)
+            self.agents[Candidate].append(candidate)
 
-            x = self.random.randrange(self.grid.width)
-            y = self.random.randrange(self.grid.height)
-            self.grid.place_agent(agent, (x, y))
+            # set candidate opinion and location
+            if opinions: 
+                opinion = opinions[i]
+            else:
+                opinion = (self.random.randrange(self.space.width), self.random.randrange(self.space.height))
+            
+            candidate.pos = opinion
+            self.space.place_agent(candidate, opinion)
+            candidate.opinion = np.array(opinion)
 
-            # voter opinion is dictated by their location
-            agent.opinion = np.array([x, y])
 
         # data collector
-        self.datacollector = mesa.datacollection.DataCollector()
+        self.datacollector = mesa.datacollection.DataCollector(
+            model_reporters = {"winner": "winner"},
+            agent_reporters = {
+                'voted_for': lambda a: a.voted_for if a.type == 'voter' else None,
+                'num_votes': lambda a: a.num_votes if a.type == 'candidate' else None
+            }
+        )
 
         self.running = True
         self.datacollector.collect(self)
@@ -101,8 +167,17 @@ class ElectionSystem(mesa.Model):
 
     def step(self):
         """
-        TODO: Count each candidates votes to determine winner.
+        This function gets called at every step in the model.
         """
-        self.datacollector.collect(self)
         self.schedule.step()
+        self.datacollector.collect(self)
+        
+        # count votes to determine winner
+        candidates = self.agents[Candidate]
+        most_votes = 0
+        for candidate in candidates:
+            if candidate.num_votes > most_votes:
+                self.winner = candidate
+                most_votes = candidate.num_votes
 
+        print(self.winner.unique_id)
