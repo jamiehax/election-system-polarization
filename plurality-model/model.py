@@ -155,12 +155,12 @@ class ElectionSystem(mesa.Model):
         # data collector
         self.datacollector = mesa.datacollection.DataCollector(
             model_reporters = {
-                "winner": "winner",
-                "opinion": "opinion"
+                'winner': 'winner',
             },
             agent_reporters = {
                 'voted_for': lambda a: a.voted_for if a.type == 'voter' else None,
                 'num_votes': lambda a: a.num_votes if a.type == 'candidate' else None,
+                'type': 'type',
                 'opinion': 'opinion'
             }
         )
