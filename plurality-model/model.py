@@ -1,6 +1,6 @@
 import mesa
 import numpy as np
-import math
+
 
 class Voter(mesa.Agent):
     """
@@ -18,40 +18,56 @@ class Voter(mesa.Agent):
         self.opinion = np.zeros(2)
         self.pos
         self.voted_for = None
+        self.interaction_function = self.model.average
+        self.get_interaction_agents = self.model.get_random_agent_set
 
 
-    def step(self):
+    def voters_move(self):
         """
-        This function gets called at every time step in the model.
+        Right now Voters move by:
+            - interacting with candidates first in some random order and taking the average opinion of each interaction
+            - interacting with voters second in some random order and taking the average opinion of each interaction
         """
-        candidate = self.get_nearest_candidate()
-        self.voted_for = candidate
-        if candidate:
-            candidate.num_votes += 1
-        self.move()
+        interaction_agents = self.get_interaction_agents()
+
+        # Voter-Candidate interaction
+        for candidate in interaction_agents['candidates']:
+            new_opinion = self.interaction_function(self, candidate)
+            self.opinion = new_opinion
+            self.pos = self.opinion
+
+        # Voter-Voter interaction
+        for voter in interaction_agents['voters']:
+            new_opinion = self.interaction_function(self, voter)
+            self.opinion = new_opinion
+            self.pos = self.opinion
 
 
-    def move(self):
-        """
-        TODO: Determine how a voter moves between elections
-        """
-        pass
+    def vote(self):
+        candidates = self.get_candidate_distances()
+        if candidates[0]:
+            self.voted_for = candidates[0][0].unique_id
+            candidates[0][0].num_votes += 1
 
-
-    def get_nearest_candidate(self):
+    
+    def get_candidate_distances(self):
         """
-        Returns the nearest candidate to the Voter.
+        Returns a list of tuples of candidates and their distances from the voter: 
+        [(Candidate1, dist1), (Candidate2, dist2), ..., (Candidate3, dist3)]
         """
         candidates = self.model.agents[Candidate]
-        min_candidate = None
-        min_dist = math.inf
-        for candidate in candidates:
-            dist = np.linalg.norm(self.opinion - candidate.opinion)
-            if dist < min_dist:
-                min_dist = dist
-                min_candidate = candidate
+        distances = [np.linalg.norm(self.opinion - candidate.opinion) for candidate in candidates]
+        candidate_distances = list(zip(candidates, distances))
+        candidate_distances.sort(key = lambda x: x[1]) 
+        return candidate_distances
 
-        return min_candidate
+
+    def candidates_move(self):
+        """
+        This method controls how Candidates move around in opinion space.
+        Mesa requires it be implemented for all agents - for Voter agents it does nothing.
+        """
+        return
 
 
 
@@ -72,20 +88,38 @@ class Candidate(mesa.Agent):
         self.opinion = np.zeros(2)
         self.pos
         self.num_votes = 0
+        self.interaction_function = self.model.average
+        self.get_interaction_agents = self.model.get_random_agent_set
 
 
-    def step(self):
+    def candidates_move(self):
         """
-        This function gets called at every time step in the model.
+        Right now Candidates move by:
+            - interacting with voters in some random order and taking the average opinion of each interaction
         """
-        self.move()
+        interaction_agents = self.get_interaction_agents()
+
+        # Voter-Voter interaction
+        for voter in interaction_agents['voters']:
+            new_opinion = self.interaction_function(self, voter)
+            self.opinion = new_opinion
+            self.pos = self.opinion
 
 
-    def move(self):
+    def vote(self):
         """
-        TODO: Determine how a candidate moves between elections
+        This method controls how Voters cast their vote.
+        Mesa requires it be implemented for all agents - for Candidate agents it does nothing.
         """
-        pass
+        return
+
+    
+    def voters_move(self):
+        """
+        This method controls how Voters move around in opinion space.
+        Mesa requires it be implemented for all agents - for Candidate agents it does nothing.
+        """
+        return
 
 
 
@@ -97,7 +131,7 @@ class ElectionSystem(mesa.Model):
     num_voters: number of voting agents
     num_candidates: number of candidate agents
     winner: the winning candidate of the election
-    agents: all agents in model stored as a dict of {"Agent Type":[agent1, agent2, ..., agentN]}
+    agents: all agents in model stored as a dict of {"AgentType":[agent1, agent2, ..., agentN]}
     """
 
 
@@ -114,7 +148,11 @@ class ElectionSystem(mesa.Model):
         self.num_candidates = num_candidates
         self.winner = None
         self.agents = {}
-        self.schedule = mesa.time.RandomActivation(self)
+        self.schedule = mesa.time.StagedActivation(
+            self,
+            stage_list=['candidates_move', 'voters_move', 'vote'],
+            shuffle_between_stages=True
+        )
         self.space = mesa.space.ContinuousSpace(x_max=width, y_max=height, torus=False)
 
         # initialize voters
@@ -176,12 +214,40 @@ class ElectionSystem(mesa.Model):
         self.schedule.step()
         self.datacollector.collect(self)
         
-        # count votes to determine winner
+        self.winner = self.plurality_count().unique_id
+        print(self.winner)
+
+
+    def plurality_count(self):
+        """
+        Returns the winner of the election for plurality count.
+        """
         candidates = self.agents[Candidate]
         most_votes = 0
+        winner = None
         for candidate in candidates:
             if candidate.num_votes > most_votes:
-                self.winner = candidate
+                winner = candidate
                 most_votes = candidate.num_votes
 
-        print(self.winner.unique_id)
+        return winner
+
+
+    def average(self, a1, a2):
+        """
+        Helpfer function to compute the average opinion of two agents.
+        """
+        return (a1.opinion + a2.opinion) / 2
+    
+
+    def get_random_agent_set(self):
+        """
+        Returns a random subset of agents to interact with as {"AgentType": [Agent1, Agent2, ..., AgentN]}
+        """
+        candidates = self.agents[Candidate]
+        voters = self.agents[Voter]
+        interaction_agents = {
+            'candidates': candidates,
+            'voters': self.random.sample(voters, len(voters) // 4)
+        }
+        return interaction_agents
