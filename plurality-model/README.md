@@ -1,1 +1,0 @@
-### Plurality Election System Model
