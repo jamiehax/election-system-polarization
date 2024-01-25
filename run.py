@@ -3,6 +3,26 @@ import os
 from tqdm import tqdm
 
 
+def main():
+    params = {
+            'num_voters': 100,
+            'num_candidates': 5,
+            'width': 1,
+            'height': 1,
+            'num_opinions': 2,
+            'voter_interaction_fn': 'avg',
+            'candidate_interaction_fn': 'avg',
+            'num_voters_to_activate': 1,
+            'num_candidates_to_activate': 1,
+            'threshold': 0.2,
+            'mu': 0.5,
+        }
+
+    model = build_model(params)
+    run_model(model, time_steps=1000)
+    save_data(model)
+
+
 def build_model(params):
     """
     THINGS WE WANT TO BE MODULAR (I.E. WE CAN CONTROL THROUGH PARAMETERS)
@@ -16,7 +36,7 @@ def build_model(params):
     height = 1
     num_opinions = 2
     voter_interaction_fn = averaging
-    candidate_interaction_fn = bounded confidence
+    candidate_interaction_fn = averaging
     num_voters_to_activate = 1
     num_candidatess_to_activate = 1
     d = 0.2
@@ -63,21 +83,5 @@ def save_data(model):
 
 
 if __name__ == '__main__':
-    params = {
-        'num_voters': 100,
-        'num_candidates': 5,
-        'width': 1,
-        'height': 1,
-        'num_opinions': 2,
-        'voter_interaction_fn': 'bc',
-        'candidate_interaction_fn': 'bc',
-        'num_voters_to_activate': 1,
-        'num_candidates_to_activate': 1,
-        'threshold': 0.2,
-        'mu': 0.5,
-    }
-
-    model = build_model(params)
-    run_model(model, time_steps=4000)
-    save_data(model)
+    main()
 

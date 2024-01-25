@@ -20,7 +20,7 @@ def main():
     #agent_locations(agent_data, time_steps)
 
     # PLOT OPINION VARIANCE
-    opinion_variance(agent_data, time_steps=10000)
+    opinion_variance(agent_data, time_steps=1000)
 
 
 def opinion_variance(agent_data, time_steps):

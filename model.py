@@ -166,7 +166,7 @@ class ElectionSystem(mesa.Model):
             if self.num_opinions == 2: 
                 pos = (opinion[0], opinion[1])
             else:
-                pos = (0, 0)
+                pos = (0, 0) # if num opinions != 2 we cant visualize anyways - just to make Mesa happy
 
             # initialize voter
             voter = Voter(i, self, opinion, pos, interaction_functions[voter_interaction_fn])
@@ -182,7 +182,7 @@ class ElectionSystem(mesa.Model):
             if self.num_opinions == 2: 
                 pos = (opinion[0], opinion[1])
             else:
-                pos = (0, 0)
+                pos = (0, 0) # if num opinions != 2 we cant visualize anyways - just to make Mesa happy
 
             # initialize candidate
             candidate = Candidate(i, self, opinion, pos, interaction_functions[candidate_interaction_fn])
