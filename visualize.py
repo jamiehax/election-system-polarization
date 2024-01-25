@@ -4,6 +4,73 @@ import matplotlib.pyplot as plt
 import os
 from tqdm import tqdm
 
+
+def main():
+    model_data = pd.read_csv('data/model_data.csv')
+    agent_data = pd.read_csv('data/agent_data.csv')
+
+    # make visualizations output directory
+    current_directory = os.getcwd()
+    final_directory = os.path.join(current_directory, r'visualizations')
+    if not os.path.exists(final_directory):
+        os.makedirs(final_directory)
+
+    # PLOT AGENT LOCATIONS   
+    time_steps = [0, 500, 1000, 5000, 10000]
+    #agent_locations(agent_data, time_steps)
+
+    # PLOT OPINION VARIANCE
+    opinion_variance(agent_data, time_steps=10000)
+
+
+def opinion_variance(agent_data, time_steps):
+
+    # create agent_locations output directory
+    current_directory = os.getcwd()
+    final_directory = os.path.join(current_directory, r'visualizations/variances')
+    if not os.path.exists(final_directory):
+        os.makedirs(final_directory)
+
+    variances = {'Step': [], 'var_opinion1': [], 'var_opinion2': []}
+    for step in range(time_steps):
+        var = agent_data.loc[agent_data['Step'] == step][['opinion1', 'opinion2']].var()
+        variances['Step'].append(step)
+        variances['var_opinion1'].append(var[0])
+        variances['var_opinion2'].append(var[1])
+
+    var_df = pd.DataFrame(variances)
+
+    plt.figure(
+        figsize=(12, 6), 
+        dpi = 600
+    )
+
+    # set plot styles
+    sns.set_style('ticks')
+
+    # plot
+    sns.lineplot(
+        data=var_df,
+        x='Step',
+        y='var_opinion1',
+        label='Opinion 1 Variance'
+    )
+
+    sns.lineplot(
+        data=var_df,
+        x='Step',
+        y='var_opinion2',
+        label='Opinion 2 Variance'
+    )
+
+    plt.xlabel('Time Step')
+    plt.ylabel('Variance in Opinion')
+    plt.title('Variance of Opinions over Time')
+
+    # save plot
+    plt.savefig('visualizations/variances/var.png')
+
+
 def agent_locations(agent_data, time_steps):
 
     # create agent_locations output directory
@@ -64,15 +131,4 @@ def agent_locations(agent_data, time_steps):
 
 
 if __name__ == '__main__':
-    model_data = pd.read_csv('data/model_data.csv')
-    agent_data = pd.read_csv('data/agent_data.csv')
-
-    # make visualizations output directory
-    current_directory = os.getcwd()
-    final_directory = os.path.join(current_directory, r'visualizations')
-    if not os.path.exists(final_directory):
-        os.makedirs(final_directory)
-
-    # PLOT AGENT LOCATIONS   
-    time_steps = [0, 500, 1000, 2000, 4000]
-    agent_locations(agent_data, time_steps)
+    main()
