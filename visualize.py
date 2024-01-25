@@ -49,23 +49,25 @@ def opinion_variance(agent_data, time_steps):
     sns.set_style('ticks')
 
     # plot
-    sns.lineplot(
+    var_plot = sns.lineplot(
         data=var_df,
         x='Step',
         y='var_opinion1',
         label='Opinion 1 Variance'
     )
-
-    sns.lineplot(
+    var_plot = sns.lineplot(
         data=var_df,
         x='Step',
         y='var_opinion2',
         label='Opinion 2 Variance'
     )
 
-    plt.xlabel('Time Step')
-    plt.ylabel('Variance in Opinion')
-    plt.title('Variance of Opinions over Time')
+    var_plot.spines[['right', 'top']].set_visible(False)
+    var_plot.set(
+        xlabel='Time Step',
+        ylabel='Variance in Opinion',
+        title='Variance in Opinions over Time'
+    )
 
     # save plot
     plt.savefig('visualizations/variances/var.png')
