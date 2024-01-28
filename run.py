@@ -9,17 +9,19 @@ def main():
             'num_candidates': 5,
             'width': 1,
             'height': 1,
-            'num_opinions': 2,
-            'voter_interaction_fn': 'avg',
-            'candidate_interaction_fn': 'avg',
+            'num_opinions': 1,
+            'voter_voter_interaction_fn': 'avg',
+            'voter_candidate_interaction_fn': None,
+            'candidate_voter_interaction_fn': 'avg',
+            'candidate_candidate_interaction_fn': None,
             'num_voters_to_activate': 1,
-            'num_candidates_to_activate': 1,
+            'num_candidates_to_activate': 5,
             'threshold': 0.2,
             'mu': 0.5,
         }
 
     model = build_model(params)
-    run_model(model, time_steps=1000)
+    run_model(model, time_steps=3000)
     save_data(model)
 
 
@@ -28,40 +30,29 @@ def build_model(params):
     THINGS WE WANT TO BE MODULAR (I.E. WE CAN CONTROL THROUGH PARAMETERS)
         - the election system (plurality, ranked choice, cardinal)
         - the method for agents to find other agents to interact with
-
-    Default Model Parameters:
-    num_voters = 100
-    num_candidates = 5
-    width = 1
-    height = 1
-    num_opinions = 2
-    voter_interaction_fn = averaging
-    candidate_interaction_fn = averaging
-    num_voters_to_activate = 1
-    num_candidatess_to_activate = 1
-    d = 0.2
-    mu = 0.5
     """
 
     model = ElectionSystem(
-        num_voters=params.get('num_voters', 100),
-        num_candidates=params.get('num_candidates', 5),
-        width=params.get('width', 1),
-        height=params.get('height', 1),
-        num_opinions=params.get('num_opinions', 2),
-        voter_interaction_fn=params.get('voter_interaction_fn', 'avg'),
-        candidate_interaction_fn=params.get('candidate_interaction_fn', 'avg'),
-        num_voters_to_activate=params.get('num_voters_to_activate', '1'),
-        num_candidates_to_activate=params.get('num_candidates_to_activate', '1'),
-        d=params.get('d', 0.2),
-        mu=params.get('mu', 0.5)
+        num_voters=params['num_voters'],
+        num_candidates=params['num_candidates'],
+        width=params['width'],
+        height=params['height'],
+        num_opinions=params['num_opinions'],
+        voter_voter_interaction_fn=params['voter_voter_interaction_fn'],
+        voter_candidate_interaction_fn=params['voter_candidate_interaction_fn'],
+        candidate_voter_interaction_fn=params['candidate_voter_interaction_fn'],
+        candidate_candidate_interaction_fn=params['candidate_candidate_interaction_fn'],
+        num_voters_to_activate=params['num_voters_to_activate'],
+        num_candidates_to_activate=params['num_candidates_to_activate'],
+        threshold=params['threshold'],
+        mu=params['mu'],
     )
     return model
 
 
 def run_model(model, time_steps):
     """
-    Run the model for the number of time steps passed in the time_steps argument
+    Run the model for the specified number of time steps.
     """
     for _ in tqdm(range(time_steps)):
         model.step()
