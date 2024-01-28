@@ -15,19 +15,66 @@ def main():
     if not os.path.exists(final_directory):
         os.makedirs(final_directory)
 
-    # PLOT AGENT LOCATIONS   
-    time_steps = [0, 500, 1000, 5000, 10000]
-    #agent_locations(agent_data, time_steps)
+    # PLOT AGENT LOCATIONS IN 1D
+    agent_locations_1d(agent_data)
 
-    # PLOT OPINION VARIANCE
-    opinion_variance(agent_data, time_steps=1000)
+    # # PLOT AGENT LOCATIONS IN 2D
+    # time_steps = [0, 500, 1000, 3000, 10000]
+    # agent_locations_2d(agent_data, time_steps)
+
+    # # PLOT OPINION VARIANCE
+    # opinion_variance(agent_data, time_steps=10000)
+
+
+def agent_locations_1d(agent_data):
+
+    # create agent_locations output directory
+    current_directory = os.getcwd()
+    final_directory = os.path.join(current_directory, r'visualizations/1d_locations')
+    if not os.path.exists(final_directory):
+        os.makedirs(final_directory)
+    
+    # set plot styles
+    sns.set_style('ticks')
+
+    plt.figure(
+        figsize=(12, 6), 
+        dpi = 600
+    )
+
+    # set plot styles
+    sns.set_style('ticks')
+    sizes = {'voter': 0.5, 'candidate': 1.5}
+    colors = {'voter': sns.color_palette('rocket')[4], 'candidate': sns.color_palette('rocket')[1]}
+
+    location_plot = sns.lineplot(
+        data=agent_data,
+        x="Step",
+        y="opinion1",
+        hue="type",
+        palette=colors,
+        size='type',
+        sizes=sizes,
+        units="AgentID",
+        estimator=None
+    )
+
+    location_plot.spines[['right', 'top']].set_visible(False)
+    location_plot.set(
+        xlabel='Time Step',
+        ylabel='Opinion',
+        title='Agent Opinions over Time'
+    )
+
+    # save plot
+    plt.savefig('visualizations/1d_locations/1dloc.png')
 
 
 def opinion_variance(agent_data, time_steps):
 
     # create agent_locations output directory
     current_directory = os.getcwd()
-    final_directory = os.path.join(current_directory, r'visualizations/variances')
+    final_directory = os.path.join(current_directory, r'visualizations/variance')
     if not os.path.exists(final_directory):
         os.makedirs(final_directory)
 
@@ -66,14 +113,15 @@ def opinion_variance(agent_data, time_steps):
     var_plot.set(
         xlabel='Time Step',
         ylabel='Variance in Opinion',
-        title='Variance in Opinions over Time'
+        title='Variance in Opinions over Time',
+        ylim=(0, 0.1)
     )
 
     # save plot
-    plt.savefig('visualizations/variances/var.png')
+    plt.savefig('visualizations/variance/var.png')
 
 
-def agent_locations(agent_data, time_steps):
+def agent_locations_2d(agent_data, time_steps):
 
     # create agent_locations output directory
     current_directory = os.getcwd()
