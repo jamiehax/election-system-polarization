@@ -1,5 +1,6 @@
 import mesa
 import numpy as np
+import math
 
 
 class Voter(mesa.Agent):
@@ -11,13 +12,12 @@ class Voter(mesa.Agent):
     voted_for: who the candidate voted for
     """
 
-    def __init__(self, uid, model, opinion, pos, voter_interaction_fn, candidate_interaction_fn):
+    def __init__(self, uid, model, opinion, voter_interaction_fn, candidate_interaction_fn):
         super().__init__(uid, model)
         self.type = 'voter'
         self.unique_id = uid
         self.voted_for = None
         self.opinion = opinion
-        self.pos = pos
         self.voter_interaction_fn = voter_interaction_fn
         self.candidate_interaction_fn = candidate_interaction_fn
         self.get_interaction_agents = self.model.get_random_agent_set
@@ -40,20 +40,7 @@ class Voter(mesa.Agent):
             # Voter-Voter interaction
             if self.voter_interaction_fn:
                 for voter in interaction_agents['voters']:
-                    self.voter_interaction_fn(a1=self, a2=voter)
-
-
-    def vote(self):
-        """
-        Increase the vote count for the closest candidate by Euclidean distance.
-        """
-        candidates = self.model.agents[Candidate]
-        distances = [np.linalg.norm(self.opinion - candidate.opinion) for candidate in candidates]
-        candidate_distances = list(zip(candidates, distances))
-        candidate_distances.sort(key = lambda x: x[1]) 
-        if candidate_distances[0]:
-            self.voted_for = candidate_distances[0][0].unique_id
-            candidate_distances[0][0].num_votes += 1        
+                    self.voter_interaction_fn(a1=self, a2=voter)     
 
 
     def candidates_move(self):
@@ -70,12 +57,11 @@ class Candidate(mesa.Agent):
     An agent representing the behavior of a cadndiate.
     """
 
-    def __init__(self, uid, model, opinion, pos, voter_interaction_fn, candidate_interaction_fn):
+    def __init__(self, uid, model, opinion, voter_interaction_fn, candidate_interaction_fn):
         super().__init__(uid, model)
         self.type = 'candidate'
         self.unique_id = uid
         self.opinion = opinion
-        self.pos = pos
         self.voted_for = uid
         self.num_votes = 0
         self.is_winner = False
@@ -103,14 +89,6 @@ class Candidate(mesa.Agent):
                 for voter in interaction_agents['voters']:
                     self.voter_interaction_fn(a1=self, a2=voter)
 
-
-    def vote(self):
-        """
-        Assume candidate votes for themselves.
-        """
-        self.num_votes += 1
-        self.voted_for = self.unique_id
-
     
     def voters_move(self):
         """
@@ -131,9 +109,8 @@ class ElectionSystem(mesa.Model):
 
         num_voters = kwargs.get('num_voters', 100)
         num_candidates = kwargs.get('num_candidates', 5)
-        width = kwargs.get('width', 1)
-        height = kwargs.get('height', 1)
         num_opinions = kwargs.get('num_opinions', 2)
+        election_system = kwargs.get('election_system', 'plurality')
         voter_voter_interaction_fn = kwargs.get('voter_voter_interaction_fn', None)
         voter_candidate_interaction_fn = kwargs.get('voter_candidate_interaction_fn', None)
         candidate_voter_interaction_fn = kwargs.get('candidate_voter_interaction_fn', None)
@@ -142,6 +119,7 @@ class ElectionSystem(mesa.Model):
         num_candidates_to_activate = kwargs.get('num_candidates_to_activate', 1)
         threshold = kwargs.get('threshold', 0.2)
         mu = kwargs.get('mu', 0.5)
+        num_rounds_before_election = kwargs.get('num_rounds_before_election', 1)
 
         # GENERAL MODEL ATTRIBUTES
         self.num_agents = num_voters + num_candidates
@@ -150,14 +128,14 @@ class ElectionSystem(mesa.Model):
         self.num_candidates = num_candidates
         self.num_candidates_to_activate = num_candidates_to_activate
         self.num_opinions = num_opinions
+        self.num_rounds_before_election = num_rounds_before_election
         self.winner = None
         self.voters_to_activate = []
         self.canddiates_to_activate = []
         self.agents = {}
-        self.space = mesa.space.ContinuousSpace(x_max=width, y_max=height, torus=False)
         self.schedule = mesa.time.StagedActivation(
             self,
-            stage_list=['candidates_move', 'voters_move', 'vote'],
+            stage_list=['candidates_move', 'voters_move'],
             shuffle_between_stages=True
         )
 
@@ -172,19 +150,22 @@ class ElectionSystem(mesa.Model):
             'kmean': self.k_mean
         }
 
+        # election systems
+        election_systems = {
+            'plurality': self.plurality_count,
+            'rc': self.ranked_choice,
+            'score': self.score_voting
+        }
+        self.election_system = election_systems[election_system]
+
         # initialize voters
         self.agents[Voter] = []
         for i in range(self.num_voters):
             # get initial voter opinion and location
-            opinion = np.array([self.random.uniform(0, min([width, height])) for _ in range(self.num_opinions)])
-            if self.num_opinions == 2:
-                pos = (opinion[0], opinion[1])
-            else:
-                pos = (0, 0) # if opinion space dimensions != 2 we cant visualize anyways - just to make Mesa happy
+            opinion = np.array([self.random.uniform(0, 1) for _ in range(self.num_opinions)])
 
             # initialize voter
-            voter = Voter(i, self, opinion, pos, interaction_functions.get(voter_voter_interaction_fn, None), interaction_functions.get(voter_candidate_interaction_fn, None))
-            self.space.place_agent(voter, pos)
+            voter = Voter(i, self, opinion, interaction_functions.get(voter_voter_interaction_fn, None), interaction_functions.get(voter_candidate_interaction_fn, None))
             self.schedule.add(voter)
             self.agents[Voter].append(voter)
 
@@ -192,15 +173,10 @@ class ElectionSystem(mesa.Model):
         self.agents[Candidate] = []
         for i in range(self.num_voters, self.num_agents):
             # get initial candidate opinion and location
-            opinion = np.array([self.random.uniform(0, min([width, height])) for _ in range(self.num_opinions)])
-            if self.num_opinions == 2:
-                pos = (opinion[0], opinion[1])
-            else:
-                pos = (0, 0) # if opinion space dimensions != 2 we cant visualize anyways - just to make Mesa happy
+            opinion = np.array([self.random.uniform(0, 1) for _ in range(self.num_opinions)])
 
             # initialize candidate
-            candidate = Candidate(i, self, opinion, pos, interaction_functions.get(candidate_voter_interaction_fn, None), interaction_functions.get(candidate_candidate_interaction_fn, None))
-            self.space.place_agent(candidate, pos)
+            candidate = Candidate(i, self, opinion, interaction_functions.get(candidate_voter_interaction_fn, None), interaction_functions.get(candidate_candidate_interaction_fn, None))
             self.schedule.add(candidate)
             self.agents[Candidate].append(candidate)
 
@@ -208,7 +184,7 @@ class ElectionSystem(mesa.Model):
         # data collector
         self.datacollector = mesa.datacollection.DataCollector(
             model_reporters = {
-                'winner': 'winner',
+                'winner': 'winner.unique_id',
             },
             agent_reporters = self.get_agent_reporter_dict()
         )
@@ -241,16 +217,20 @@ class ElectionSystem(mesa.Model):
         # move agents
         self.schedule.step()
 
-        # find winner
-        winner = self.plurality_count()
-        winner.is_winner = True
-        self.winner = winner.unique_id
+        # find winner only on election round
+        if self.schedule.steps % self.num_rounds_before_election == 0:
+
+            # clear old winner
+            if self.winner: next((candidate for candidate in self.agents[Candidate] if candidate is self.winner), None).is_winner = False
+            self.winner = None
+
+            # find new winner
+            winner = self.election_system()
+            winner.is_winner = True
+            self.winner = winner
 
         # collect data for round
         self.datacollector.collect(self)
-
-        # clear winner for next round
-        if self.winner: next((candidate for candidate in self.agents[Candidate] if candidate.unique_id == self.winner), None).is_winner = False
 
 
     def plurality_count(self):
@@ -258,16 +238,95 @@ class ElectionSystem(mesa.Model):
         Returns the winner of the election for plurality count, and resets all candidate vote counts.
         """
         candidates = self.agents[Candidate]
-        most_votes = 0
-        winner = None
-        for candidate in candidates:
-            if candidate.num_votes > most_votes:
-                winner = candidate
-                most_votes = candidate.num_votes
+        voters = self.agents[Voter]
+        voter_preferences = []
+        for voter in voters:
+            distances = [np.linalg.norm(voter.opinion - candidate.opinion) for candidate in candidates]
+            candidate_distances = list(zip(candidates, distances))
+            candidate_distances.sort(key=lambda x: x[1])
+            voter_preferences.append([c[0] for c in candidate_distances])
+            voter.voted_for = candidate_distances[0][0].unique_id
+        
+        # get vote counts
+        counts = {candidate:0 for candidate in candidates}
+        for ballot in voter_preferences:
+            selected_candidate = ballot[0]
+            counts[selected_candidate] += 1
 
+        # set vote counts for candidates
+        for candidate, num_votes in counts.items():
+            candidate.num_votes = num_votes
+
+        winner = max(counts, key=counts.get)
+        return winner
+
+
+    def ranked_choice(self):
+        """
+        Returns the winner of the election according to instant runoff ranked choice.
+        """
+        candidates = self.agents[Candidate].copy()
+        voters = self.agents[Voter].copy()
+        voter_preferences = []
+        for voter in voters:
+            distances = [np.linalg.norm(voter.opinion - candidate.opinion) for candidate in candidates]
+            candidate_distances = list(zip(candidates, distances))
+            candidate_distances.sort(key=lambda x: x[1])
+            voter_preferences.append([c[0] for c in candidate_distances])
+        
         for candidate in candidates:
             candidate.num_votes = 0
 
+        winner = None
+        while winner is None:
+            counts = {candidate:0 for candidate in candidates}
+            for ballot in voter_preferences:
+                selected_candidate = ballot[0]
+                counts[selected_candidate] += 1
+
+            max_vote_candidate = max(counts, key=counts.get)
+            if counts[max_vote_candidate] > ((len(voters) // 2) + 1):
+                winner = max_vote_candidate
+                for candidate, num_votes in counts.items():
+                    candidate.num_votes = num_votes
+                for voter, preference in zip(voters, voter_preferences):
+                    voter.voted_for = preference[0].unique_id
+            else:
+                least_vote_candidate = min(counts, key=counts.get)
+                candidates.remove(least_vote_candidate)
+                for ballot in voter_preferences:
+                    ballot.remove(least_vote_candidate)
+
+        return winner
+
+
+    def score_voting(self):
+        """
+        Returns the winner of the election according to score voting.
+        """
+        candidates = self.agents[Candidate]
+        voters = self.agents[Voter]
+        voter_preferences = []
+        for voter in voters:
+            distances = [np.linalg.norm(voter.opinion - candidate.opinion) for candidate in candidates]
+            candidate_distances = list(zip(candidates, distances))
+            candidate_distances.sort(key=lambda x: x[1])
+            voter_preferences.append(candidate_distances)
+
+        # maximum distance two agents can be apart in opinion space
+        max_distance = math.sqrt(self.num_opinions)
+        
+        # get vote counts
+        scores = {candidate:0 for candidate in candidates}
+        for ballot in voter_preferences:
+            for candidate, distance in ballot:
+                scores[candidate] += (max_distance - distance)
+
+        # set vote counts for candidates
+        for candidate, score in scores.items():
+            candidate.num_votes = score
+
+        winner = max(scores, key=scores.get)
         return winner
 
 

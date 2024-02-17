@@ -7,7 +7,8 @@ from tqdm import tqdm
 
 def main():
     model_data = pd.read_csv('data/model_data.csv')
-    agent_data = pd.read_csv('data/agent_data.csv')
+    agent_data_bc = pd.read_csv('data/agent_data_bc.csv')
+    agent_data_avg = pd.read_csv('data/agent_data_avg.csv')
 
     # make visualizations output directory
     current_directory = os.getcwd()
@@ -16,14 +17,68 @@ def main():
         os.makedirs(final_directory)
 
     # PLOT AGENT LOCATIONS IN 1D
-    agent_locations_1d(agent_data)
+    #agent_locations_1d(agent_data_avg)
+
+    # PLOT OPINION VARIANCE IN 1D
+    opinion_variance_1d(agent_data_bc, agent_data_avg, 3000)
 
     # # PLOT AGENT LOCATIONS IN 2D
     # time_steps = [0, 500, 1000, 3000, 10000]
     # agent_locations_2d(agent_data, time_steps)
 
-    # # PLOT OPINION VARIANCE
+    # # PLOT OPINION VARIANCE IN 2D
     # opinion_variance(agent_data, time_steps=10000)
+
+
+def opinion_variance_1d(agent_data_bc, agent_data_avg, time_steps):
+    
+    # create agent_locations output directory
+    current_directory = os.getcwd()
+    final_directory = os.path.join(current_directory, r'visualizations/variance')
+    if not os.path.exists(final_directory):
+        os.makedirs(final_directory)
+
+    variance = {'Step': [], 'Model Type': [], 'var_opinion': []}
+    for step in range(time_steps):
+        # variance['Step'].append(step)
+        # variance['Model Type'].append('Bounded Confidence')
+        # var_bc = agent_data_bc.loc[agent_data_bc['Step'] == step]['opinion1'].var()
+        # variance['var_opinion'].append(var_bc)
+        variance['Step'].append(step)
+        variance['Model Type'].append('Averaging')
+        var_avg = agent_data_avg.loc[agent_data_avg['Step'] == step]['opinion1'].var()
+        variance['var_opinion'].append(var_avg)
+
+    var_df = pd.DataFrame(variance)
+
+    plt.figure(
+        figsize=(12, 6), 
+        dpi = 600
+    )
+
+    # set plot styles
+    sns.set_style('ticks')
+    colors = {'Bounded Confidence': sns.color_palette('Paired')[1], 'Averaging': sns.color_palette('Paired')[6]}
+
+    # plot
+    var_plot = sns.lineplot(
+        data=var_df,
+        x='Step',
+        y='var_opinion',
+        hue='Model Type',
+        palette=colors
+    )
+
+    var_plot.spines[['right', 'top']].set_visible(False)
+    var_plot.set(
+        xlabel='Time Step',
+        ylabel='Variance in Opinion',
+        title='Variance in Opinion over Time',
+        ylim=(0, 0.1)
+    )
+
+    # save plot
+    plt.savefig('visualizations/variance/var.png')
 
 
 def agent_locations_1d(agent_data):
@@ -45,7 +100,7 @@ def agent_locations_1d(agent_data):
     # set plot styles
     sns.set_style('ticks')
     sizes = {'voter': 0.5, 'candidate': 1.5}
-    colors = {'voter': sns.color_palette('rocket')[4], 'candidate': sns.color_palette('rocket')[1]}
+    colors = {'voter': sns.color_palette('Set2')[7], 'candidate': sns.color_palette('rocket')[1]}
 
     location_plot = sns.lineplot(
         data=agent_data,
@@ -62,8 +117,8 @@ def agent_locations_1d(agent_data):
     location_plot.spines[['right', 'top']].set_visible(False)
     location_plot.set(
         xlabel='Time Step',
-        ylabel='Opinion',
-        title='Agent Opinions over Time'
+        ylabel='Opinion Value',
+        title="Change in Agent's Opinion from Averaging Opinion Updates"
     )
 
     # save plot

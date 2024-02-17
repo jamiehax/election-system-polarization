@@ -5,23 +5,23 @@ from tqdm import tqdm
 
 def main():
     params = {
-            'num_voters': 100,
-            'num_candidates': 5,
-            'width': 1,
-            'height': 1,
-            'num_opinions': 1,
-            'voter_voter_interaction_fn': 'avg',
-            'voter_candidate_interaction_fn': None,
-            'candidate_voter_interaction_fn': 'avg',
+            'num_voters': 10,
+            'num_candidates': 3,
+            'num_opinions': 2,
+            'election_system': 'score', # plurality, rc, score
+            'voter_voter_interaction_fn': 'avg', # avg, bc
+            'voter_candidate_interaction_fn': 'avg', # avg, bc
+            'candidate_voter_interaction_fn': 'avg', # avg, bc, kmean
             'candidate_candidate_interaction_fn': None,
             'num_voters_to_activate': 1,
-            'num_candidates_to_activate': 5,
+            'num_candidates_to_activate': 3,
             'threshold': 0.2,
             'mu': 0.5,
+            'num_rounds_before_election': 3
         }
 
     model = build_model(params)
-    run_model(model, time_steps=3000)
+    run_model(model, time_steps=15)
     save_data(model)
 
 
@@ -35,9 +35,8 @@ def build_model(params):
     model = ElectionSystem(
         num_voters=params['num_voters'],
         num_candidates=params['num_candidates'],
-        width=params['width'],
-        height=params['height'],
         num_opinions=params['num_opinions'],
+        election_system=params['election_system'],
         voter_voter_interaction_fn=params['voter_voter_interaction_fn'],
         voter_candidate_interaction_fn=params['voter_candidate_interaction_fn'],
         candidate_voter_interaction_fn=params['candidate_voter_interaction_fn'],
@@ -46,6 +45,7 @@ def build_model(params):
         num_candidates_to_activate=params['num_candidates_to_activate'],
         threshold=params['threshold'],
         mu=params['mu'],
+        num_rounds_before_election=params['num_rounds_before_election']
     )
     return model
 
