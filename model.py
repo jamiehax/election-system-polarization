@@ -312,6 +312,7 @@ class ElectionSystem(mesa.Model):
             candidate_distances = list(zip(candidates, distances))
             candidate_distances.sort(key=lambda x: x[1])
             voter_preferences.append(candidate_distances)
+            voter.voted_for = candidate_distances[0][0].unique_id
 
         # maximum distance two agents can be apart in opinion space
         max_distance = math.sqrt(self.num_opinions)
