@@ -2,22 +2,31 @@ from model import ElectionSystem
 import os
 from tqdm import tqdm
 
-
 def main():
     params = {
             'num_voters': 10,
-            'num_candidates': 3,
-            'num_opinions': 2,
-            'election_system': 'score', # plurality, rc, score
-            'voter_voter_interaction_fn': 'avg', # avg, bc
-            'voter_candidate_interaction_fn': 'avg', # avg, bc
-            'candidate_voter_interaction_fn': 'avg', # avg, bc, kmean
-            'candidate_candidate_interaction_fn': None,
             'num_voters_to_activate': 1,
-            'num_candidates_to_activate': 3,
-            'threshold': 0.2,
+            'initial_num_candidates': 3,
+            'min_candidates': 3,
+            'max_candidates': 5,
+            'num_candidates_to_activate': 3, # since num candidates changes, activates no more than this number
+            'term_limit': 2,
+            'num_opinions': 3,
+            'election_system': 'plurality', # plurality, rc, score
+            'voter_voter_interaction_fn': 'bc', # avg, bc
+            'voter_candidate_interaction_fn': 'bc', # avg, bc
+            'candidate_voter_interaction_fn': 'avg', # avg, bc, kmean, ascent
+            'candidate_candidate_interaction_fn': None,
+            'initial_exit_probability': 0.33,
+            'exit_probability_decrease_factor': 0.25,     
+            'initial_threshold': 0.2,
+            'threshold_increase_factor': 0.25,
+            'num_candidates_to_benefit': 2,
+            'num_rounds_before_election': 3,
             'mu': 0.5,
-            'num_rounds_before_election': 3
+            'radius': 0.2,
+            'beta': 0.2,
+            'C': 0.2
         }
 
     model = build_model(params)
@@ -33,8 +42,10 @@ def build_model(params):
     """
 
     model = ElectionSystem(
+        seed=0,
         num_voters=params['num_voters'],
-        num_candidates=params['num_candidates'],
+        initial_num_candidates=params['initial_num_candidates'],
+        term_limit=params['term_limit'],
         num_opinions=params['num_opinions'],
         election_system=params['election_system'],
         voter_voter_interaction_fn=params['voter_voter_interaction_fn'],
@@ -43,9 +54,18 @@ def build_model(params):
         candidate_candidate_interaction_fn=params['candidate_candidate_interaction_fn'],
         num_voters_to_activate=params['num_voters_to_activate'],
         num_candidates_to_activate=params['num_candidates_to_activate'],
-        threshold=params['threshold'],
+        initial_exit_probability=params['initial_exit_probability'],
+        exit_probability_decrease_factor=params['exit_probability_decrease_factor'],
+        min_candidates=params['min_candidates'],
+        max_candidates=params['max_candidates'],
+        initial_threshold=params['initial_threshold'],
+        threshold_increase_factor=params['threshold_increase_factor'],
+        num_candidates_to_benefit=params['num_candidates_to_benefit'],
         mu=params['mu'],
-        num_rounds_before_election=params['num_rounds_before_election']
+        num_rounds_before_election=params['num_rounds_before_election'],
+        radius=params['radius'],
+        beta=params['beta'],
+        C=params['C']
     )
     return model
 
