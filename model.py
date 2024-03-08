@@ -137,6 +137,7 @@ class ElectionSystem(mesa.Model):
         gamma = kwargs.get('gamma', 0.2)
         radius = kwargs.get('radius', 1)
         learning_rate = kwargs.get('learning_rate', 0.1)
+        second_choice_weight_factor = kwargs.get('second_choice_weight_factor', 0.1)
 
         # GENERAL MODEL ATTRIBUTES
         self.num_agents = num_voters + initial_num_candidates
@@ -178,6 +179,7 @@ class ElectionSystem(mesa.Model):
         self.radius = radius
         self.gamma = gamma
         self.learning_rate = learning_rate
+        self.second_choice_weight_factor = second_choice_weight_factor
 
         # agent interaction functions
         self.interaction_functions = {
@@ -194,6 +196,13 @@ class ElectionSystem(mesa.Model):
             'score': self.score_voting
         }
         self.election_system = election_systems[election_system]
+
+        # candidate gradient ascent objective functions
+        objective_functions = {
+            'plurality': self.plurality_objective_fn,
+            'rc': self.rc_objective_fn
+        }
+        self.candidate_objective_fn = objective_functions[election_system]
 
         # initialize voters
         self.agents[Voter] = []
@@ -393,8 +402,10 @@ class ElectionSystem(mesa.Model):
         """
         Returns the winner of the election according to instant runoff ranked choice.
         """
-        candidates = self.agents[Candidate]
-        voters = self.agents[Voter]
+
+        # create copy lists to remove candidates from during election rounds
+        candidates = self.agents[Candidate].copy()
+        voters = self.agents[Voter].copy()
 
         # tensor of each voters probaility of voting for each candidate
         voter_opinions = torch.stack([torch.tensor(v.opinion) for v in voters])
@@ -551,7 +562,7 @@ class ElectionSystem(mesa.Model):
         candidates = [c for c in self.agents[Candidate]] # list of candidates in same order as gradients
         candidate_opinions.requires_grad_(True)
         
-        expected_votes = self.plurality_objective_fn(voter_opinions, candidate_opinions)
+        expected_votes = self.candidate_objective_fn(voter_opinions, candidate_opinions)
 
         # update candidates positions with gradients
         for candidate_index, candidate in zip(range(len(self.agents[Candidate])), candidates):
@@ -563,29 +574,49 @@ class ElectionSystem(mesa.Model):
 
     def plurality_objective_fn(self, X, y):
         """
-        Returns the sum of probabilities that for all voters for voting for each candidate.
+        Returns the expected votes of each candidate based on first choice probabilities.
+        """
+        vote_probabilities = self.vote_probabilities(X, y)
+        expected_votes = vote_probabilities.sum(dim=0)
+        return expected_votes
+    
+
+    def rc_objective_fn(self, X, y):
+        """
+        Returns the expected votes of each candidate based on first and second choice probabilities.
         """
 
-        # calculate euclidean distance
-        D = X.unsqueeze(1) - y.unsqueeze(0)
-        D_squared = D ** 2
-        D_summed = torch.sum(D_squared, dim=2)
-        D = torch.sqrt(D_summed)
+        # calculate the first choice expected votes for each candidate
+        first_choice_probs = self.vote_probabilities(X, y)
+        first_expected_votes = first_choice_probs.sum(dim=0)
 
-        # apply "radius of support" function to each distance
-        g = lambda z: (1 / (1 + torch.exp(self.gamma * (z - self.radius))))
-        R = g(D)
-        R.requires_grad_(True)
+        # calculate the second choice expected votes for each candidate
+        second_choice_probs = torch.zeros_like(first_choice_probs)
+        for j in range(len(y)):
 
-        # apply softmax
-        s = lambda z: torch.exp(self.beta * z)
-        S = s(R)
-        S.requires_grad_(True)
+            # vote probabilities when candidate j is not in race
+            if j == y.shape[0] - 1: # edge case of last row not slicing correctly
+                y_no_j = y[:j] 
+            else:
+                y_no_j = torch.cat((y[:j], y[j+1:]), dim=0)
+            second_probs = self.vote_probabilities(X, y_no_j)
 
-        # calculate the expected votes for each candidate
-        expected_votes = S / S.sum(dim=1).unsqueeze(1)
-        expected_votes = expected_votes.sum(dim=0)
+            # insert column of zero probs at candidate j index
+            zeros_column = torch.zeros(second_probs.shape[0], 1)
+            second_probs = torch.cat((second_probs[:, :j], zeros_column, second_probs[:, j:]), dim=1)
+
+            # multiply first choice probs by second choice probs
+            second_probs = second_probs * first_choice_probs
+
+            # add second choice probs with respect to candidate j to probs sum
+            second_choice_probs = second_choice_probs + second_probs
+
+
+        second_expected_votes = second_choice_probs.sum(dim=0)
+
+        expected_votes = first_expected_votes + (self.second_choice_weight_factor * second_expected_votes)
         return expected_votes
+    
     
 
     def vote_probabilities(self, voter_opinions, candidate_opinions):

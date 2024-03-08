@@ -12,7 +12,7 @@ def main():
             'num_candidates_to_activate': 3, # since num candidates changes, activates no more than this number
             'term_limit': 2,
             'num_opinions': 3,
-            'election_system': 'plurality', # plurality, rc, score
+            'election_system': 'rc', # plurality, rc, score
             'voter_voter_interaction_fn': 'bc', # avg, bc
             'voter_candidate_interaction_fn': 'bc', # avg, bc
             'candidate_voter_interaction_fn': 'avg', # avg, bc, kmean, ascent
@@ -26,7 +26,8 @@ def main():
             'mu': 0.5,
             'radius': 0.2,
             'beta': 0.2,
-            'C': 0.2
+            'C': 0.2,
+            'second_choice_weight_factor': 0.1
         }
 
     model = build_model(params)
@@ -65,7 +66,8 @@ def build_model(params):
         num_rounds_before_election=params['num_rounds_before_election'],
         radius=params['radius'],
         beta=params['beta'],
-        C=params['C']
+        C=params['C'],
+        second_choice_weight_factor=params['second_choice_weight_factor']
     )
     return model
 
