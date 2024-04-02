@@ -3,10 +3,14 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import os
 from tqdm import tqdm
+from model import ElectionSystem
+from run import save_data
+import numpy as np
 
 
 def main():
     model_data = pd.read_csv('data/model_data.csv')
+    agent_data = pd.read_csv('data/agent_data.csv')
     agent_data_bc = pd.read_csv('data/agent_data_bc.csv')
     agent_data_avg = pd.read_csv('data/agent_data_avg.csv')
 
@@ -16,11 +20,14 @@ def main():
     if not os.path.exists(final_directory):
         os.makedirs(final_directory)
 
+    # PLOT PARAMETER SWEEP
+    parameter_sweep()
+
     # PLOT AGENT LOCATIONS IN 1D
-    #agent_locations_1d(agent_data_avg)
+    #agent_locations_1d(agent_data)
 
     # PLOT OPINION VARIANCE IN 1D
-    opinion_variance_1d(agent_data_bc, agent_data_avg, 3000)
+    #opinion_variance_1d(agent_data_bc, agent_data_avg, 3000)
 
     # # PLOT AGENT LOCATIONS IN 2D
     # time_steps = [0, 500, 1000, 3000, 10000]
@@ -28,6 +35,87 @@ def main():
 
     # # PLOT OPINION VARIANCE IN 2D
     # opinion_variance(agent_data, time_steps=10000)
+
+
+def parameter_sweep():
+
+    # create sweeps output directory
+    current_directory = os.getcwd()
+    final_directory = os.path.join(current_directory, r'visualizations/sweeps')
+    if not os.path.exists(final_directory):
+        os.makedirs(final_directory)
+
+    # sweep data frame
+    num_sweeps = 9
+    responsiveness_list = np.linspace(0.1, 1, num_sweeps, endpoint=False)
+    tolerance_list = np.linspace(0.1, 1, num_sweeps, endpoint=False)
+    responsiveness_list = np.round(responsiveness_list, decimals=2)
+    tolerance_list = np.round(tolerance_list, decimals=2)
+    df = pd.DataFrame(columns=['responsiveness', 'tolerance', 'variance'])
+
+    # set figure dimensions
+    plt.figure(
+        figsize=(6, 6), 
+        dpi = 600
+    )
+
+    for responsiveness in tqdm(responsiveness_list):
+        for tolerance in tolerance_list:
+
+            model = ElectionSystem(
+                    #seed=0,
+                    num_voters=100,
+                    num_voters_to_activate=1,
+                    initial_num_candidates=3,
+                    min_candidates=3,
+                    max_candidates=5,
+                    term_limit=2,
+                    num_opinions=1,
+                    election_system='plurality', # plurality, rc, score
+                    voter_voter_interaction_fn='ar', # avg, bc, bc1, ar
+                    voter_candidate_interaction_fn='ar', # avg, bc, bc1, ar
+                    voter_noise_factor=0.01,
+                    initial_exit_probability=0.33,
+                    exit_probability_decrease_factor=0.25,     
+                    initial_threshold=tolerance,
+                    threshold_increase_factor=0.1,
+                    num_candidates_to_benefit=2,
+                    num_rounds_before_election=10,
+                    mu=0.5, # mu in bounded confidence (controls magnitude of opinion update)
+                    radius=0.1, # r in radius of support function (controls inflection point)
+                    learning_rate=0.001, # learning rate for candidate gradient ascent
+                    gamma=10, # gamma in radius of support function (controls steepness which is effectively variation in voting probabilities)
+                    beta=1,
+                    second_choice_weight_factor=0.5,
+                    exposure=0.2,
+                    responsiveness=responsiveness
+                )
+
+
+            print(f"trying with parameters: responsiveness: {responsiveness}, threshold: {tolerance}")
+            num_steps = 100
+            for _ in range(num_steps):
+                model.step()
+
+
+            save_data(model)
+
+            agent_data = pd.read_csv('data/agent_data.csv')
+
+            variance = float(agent_data.loc[agent_data['Step'] == num_steps][['opinion1']].var())
+            df.loc[df.shape[0]] = [responsiveness, tolerance, variance]
+
+    sns.heatmap(data=df.pivot('responsiveness', 'tolerance', 'variance'), cmap='rocket')
+    plt.xlabel('Tolerance')
+    plt.ylabel('Responsiveness')
+    plt.gca().invert_yaxis()
+    plt.title('Heatmap of Variance')
+
+    # save plot
+    plt.savefig('visualizations/sweeps/sweep.png')
+
+
+
 
 
 def opinion_variance_1d(agent_data_bc, agent_data_avg, time_steps):

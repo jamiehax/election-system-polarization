@@ -7,10 +7,6 @@ import torch
 class Voter(mesa.Agent):
     """
     An agent representing the behavior of a voter.
-
-    uid: the unique ID of the voter
-    opinion: the array representing the voter's opinions as well as their position
-    voted_for: who the candidate voted for
     """
 
     def __init__(self, uid, model, opinion, threshold, voter_interaction_fn, candidate_interaction_fn):
@@ -27,31 +23,21 @@ class Voter(mesa.Agent):
 
     def voters_move(self):
         """
-        How voters move between elections. Determined by:
-            - who they interact with (self.get_interaction_agents)
-            - how they interact with other agents (self.candidate_interaction_fn and self.voter_interaction_fn)
+        Move the voter according to their opinion update functions.
         """
         if self.unique_id in self.model.voters_to_activate:
             interaction_agents = self.get_interaction_agents(num_voters=1, num_candidates=1)
 
-            # Voter-Candidate interaction
-            if self.candidate_interaction_fn:
-                for candidate in interaction_agents['candidates']:
-                    self.candidate_interaction_fn(a1=self, a2=candidate, threshold=candidate.threshold)
-
             # Voter-Voter interaction
             if self.voter_interaction_fn:
                 for voter in interaction_agents['voters']:
-                    self.voter_interaction_fn(a1=self, a2=voter)     
+                    self.voter_interaction_fn(self, voter)     
 
-
-    def candidates_move(self):
-        """
-        This method controls how Candidates move around in opinion space.
-        Mesa requires it be implemented for all agents - for Voter agents it does nothing.
-        """
-        return
-
+            # Voter-Candidate interaction
+            if self.candidate_interaction_fn:
+                for candidate in interaction_agents['candidates']:
+                    self.candidate_interaction_fn(self, candidate, threshold=candidate.threshold)
+          
 
 
 class Candidate(mesa.Agent):
@@ -59,7 +45,7 @@ class Candidate(mesa.Agent):
     An agent representing the behavior of a cadndiate.
     """
 
-    def __init__(self, uid, model, opinion, threshold, voter_interaction_fn, candidate_interaction_fn, exit_probability):
+    def __init__(self, uid, model, opinion, threshold, exit_probability):
         super().__init__(uid, model)
         self.type = 'candidate'
         self.unique_id = uid
@@ -70,29 +56,7 @@ class Candidate(mesa.Agent):
         self.is_winner = False
         self.num_wins = 0
         self.exit_probability = exit_probability
-        self.voter_interaction_fn = voter_interaction_fn
-        self.candidate_interaction_fn = candidate_interaction_fn
         self.get_interaction_agents = self.model.get_random_agent_set
-
-
-    def candidates_move(self):
-        """
-        How candidates move between elections. Determined by:
-            - who they interact with (self.get_interaction_agents)
-            - how they interact with other agents (self.update_opinion)
-        """
-        if self.unique_id in self.model.candidates_to_activate:
-            interaction_agents = self.get_interaction_agents(num_voters=1, num_candidates=0)
-
-            # Candidate-Candidate interaction
-            if self.candidate_interaction_fn:
-                for candidate in interaction_agents['candidates']:
-                    self.candidate_interaction_fn(a1=self, a2=candidate)
-            
-            # Candidate-Voter interaction
-            if self.voter_interaction_fn:
-                for voter in interaction_agents['voters']:
-                    self.voter_interaction_fn(a1=self, a2=voter, threshold=self.threshold)
 
     
     def voters_move(self):
@@ -119,10 +83,7 @@ class ElectionSystem(mesa.Model):
         election_system = kwargs.get('election_system', 'plurality')
         voter_voter_interaction_fn = kwargs.get('voter_voter_interaction_fn', None)
         voter_candidate_interaction_fn = kwargs.get('voter_candidate_interaction_fn', None)
-        candidate_voter_interaction_fn = kwargs.get('candidate_voter_interaction_fn', None)
-        candidate_candidate_interaction_fn = kwargs.get('candidate_candidate_interaction_fn', None)
         num_voters_to_activate = kwargs.get('num_voters_to_activate', 1)
-        num_candidates_to_activate = kwargs.get('num_candidates_to_activate', 1)
         initial_exit_probability = kwargs.get('initial_exit_probability', 0.5)
         exit_probability_decrease_factor = kwargs.get('exit_probability_decrease_factor', 0.5)
         min_candidates = kwargs.get('min_candidates', 2)
@@ -133,18 +94,20 @@ class ElectionSystem(mesa.Model):
         mu = kwargs.get('mu', 0.5)
         num_rounds_before_election = kwargs.get('num_rounds_before_election', 1)
         beta = kwargs.get('beta', 0.2)
-        C = kwargs.get('C', 5)
         gamma = kwargs.get('gamma', 0.2)
         radius = kwargs.get('radius', 1)
         learning_rate = kwargs.get('learning_rate', 0.1)
         second_choice_weight_factor = kwargs.get('second_choice_weight_factor', 0.1)
+        voter_noise_factor = kwargs.get('voter_noise_factor', 0)
+        exposure = kwargs.get('exposure', 0.5)
+        responsiveness = kwargs.get('responsiveness', 0.2)
 
         # GENERAL MODEL ATTRIBUTES
         self.num_agents = num_voters + initial_num_candidates
         self.num_voters = num_voters
         self.num_voters_to_activate = num_voters_to_activate
+        self.voter_noise_factor = voter_noise_factor
         self.initial_num_candidates = initial_num_candidates
-        self.num_candidates_to_activate = num_candidates_to_activate
         self.min_candidates = min_candidates
         self.max_candidates = max_candidates
         self.term_limit = term_limit
@@ -156,15 +119,13 @@ class ElectionSystem(mesa.Model):
         self.agents = {}
         self.schedule = mesa.time.StagedActivation(
             self,
-            stage_list=['candidates_move', 'voters_move'],
+            stage_list=['voters_move'],
             shuffle_between_stages=True
         )
 
         # for adding candidates in later on
         self.candidate_index = num_voters
         self.initial_exit_probability = initial_exit_probability
-        self.candidate_voter_interaction_fn = candidate_voter_interaction_fn
-        self.candidate_candidate_interaction_fn = candidate_candidate_interaction_fn
         self.exit_probability_decrease_factor = exit_probability_decrease_factor
 
         # bounded confidence parameters
@@ -173,8 +134,11 @@ class ElectionSystem(mesa.Model):
         self.num_candidates_to_benefit = num_candidates_to_benefit
         self.mu = mu
 
+        # attraction-repulsion parameters
+        self.exposure = exposure
+        self.responsiveness = responsiveness
+
         # candidate ascent parameters
-        self.C = C
         self.beta = beta
         self.radius = radius
         self.gamma = gamma
@@ -185,8 +149,9 @@ class ElectionSystem(mesa.Model):
         self.interaction_functions = {
             'avg': self.average_opinion,
             'bc': self.bounded_confidence,
+            'bc1': self.bounded_confidence_one_sided,
             'kmean': self.k_mean,
-            'ascent': self.candidate_ascent
+            'ar': self.attraction_repulsion
         }
 
         # election systems
@@ -234,8 +199,6 @@ class ElectionSystem(mesa.Model):
                 self,
                 opinion,
                 self.initial_threshold,
-                self.interaction_functions.get(candidate_voter_interaction_fn, None),
-                self.interaction_functions.get(candidate_candidate_interaction_fn, None),
                 initial_exit_probability
             )
             self.schedule.add(candidate)
@@ -277,12 +240,14 @@ class ElectionSystem(mesa.Model):
 
         # randomly select agents to interact
         self.voters_to_activate = self.random.sample([a.unique_id for a in self.agents[Voter]], self.num_voters_to_activate)
-        self.candidates_to_activate = self.random.sample([a.unique_id for a in self.agents[Candidate]], min(len(self.agents[Candidate]), self.num_candidates_to_activate))
 
-        # move agents
+        # move voters
         self.schedule.step()
 
-        # find winner only on election round
+        # candidates move strategically
+        self.candidate_ascent()
+
+        # election round processes
         if self.schedule.steps % self.num_rounds_before_election == 0:
 
             # clear old winner
@@ -297,8 +262,6 @@ class ElectionSystem(mesa.Model):
             winner.is_winner = True
             winner.num_wins += 1
             self.winner = winner
-
-            self.candidate_ascent()
 
             # add and remove candidates
             self.change_candidates(winner)
@@ -350,8 +313,6 @@ class ElectionSystem(mesa.Model):
                 self,
                 opinion,
                 self.initial_threshold,
-                self.interaction_functions.get(self.candidate_voter_interaction_fn, None),
-                self.interaction_functions.get(self.candidate_candidate_interaction_fn, None),
                 self.initial_exit_probability
             )
             self.schedule.add(candidate)
@@ -374,6 +335,7 @@ class ElectionSystem(mesa.Model):
         voter_probabilities = self.vote_probabilities(voter_opinions, candidate_opinions)
         ballots = []
         for voter, prob in zip(voters, voter_probabilities):
+            # prob[torch.isnan(prob)] = 0 # replace NaN values with 0
             vote = np.random.choice(candidates, size=1, p=prob)[0]
             ballots.append(vote)
             voter.voted_for = vote.unique_id
@@ -506,33 +468,55 @@ class ElectionSystem(mesa.Model):
         return winner
 
 
-    def average_opinion(self, **kwargs):
+    def average_opinion(self, a1, a2, threshold=None):
         """
-        Update agent a1's opinion to be the average of a1's position and a2's opinion.
+        Update agent a1 and s2's opinions to be the average of their opinions.
         """
-        a1 = kwargs.get('a1', None)
-        a2 = kwargs.get('a2', None)
-        if isinstance(a1, mesa.Agent) and isinstance(a2, mesa.Agent) and a1 and a2:
-            a1.opinion = (a1.opinion + a2.opinion) / 2
-        else:
-            raise TypeError('Invalid parameter type. The average opinion update function accepts exactly two agents as parameters.')
-    
+        average = ((a1.opinion + a2.opinion) / 2) + (self.voter_noise_factor * np.random.normal(0, 1, size=self.num_opinions))
+        a1.opinion = self.bounded_update(average)
+        a2.opinion = self.bounded_update(average)
 
-    def bounded_confidence(self, **kwargs):
+
+    def bounded_confidence(self, a1, a2, threshold=None):
         """
         Update agent a1 and a2's opinions according to the bounded confidence model.
         """
-        a1 = kwargs.get('a1', None)
-        a2 = kwargs.get('a2', None)
-        threshold = kwargs.get('threshold', self.initial_threshold)
-        if isinstance(a1, mesa.Agent) and isinstance(a2, mesa.Agent) and a1 and a2:
-            if np.linalg.norm(a1.opinion - a2.opinion) < threshold:
-                a1.opinion = a1.opinion + (self.mu * (a2.opinion - a1.opinion))   
-                a2.opinion = a2.opinion + (self.mu * (a1.opinion - a2.opinion))
-        else:
-            raise TypeError('Invalid parameter type. The average opinion update function accepts exactly two agents as parameters.')
+        if not threshold:
+            threshold = self.initial_threshold
+
+        if np.linalg.norm(a1.opinion - a2.opinion) < threshold:
+            a1.opinion = self.bounded_update((a1.opinion + (self.mu * (a2.opinion - a1.opinion))) + (self.voter_noise_factor * np.random.normal(0, 1, size=self.num_opinions)))
+            a2.opinion = self.bounded_update((a2.opinion + (self.mu * (a1.opinion - a2.opinion))) + (self.voter_noise_factor * np.random.normal(0, 1, size=self.num_opinions)))
+
+
+    def bounded_confidence_one_sided(self, a1, a2, threshold=None):
+        """
+        Update agent a1's according to a one sided bounded confidence opinion update.
+        """
+        if not threshold:
+            threshold = self.initial_threshold
+
+        if np.linalg.norm(a1.opinion - a2.opinion) < threshold:
+            a1.opinion = self.bounded_update((a1.opinion + (self.mu * (a2.opinion - a1.opinion))) + (self.voter_noise_factor * np.random.normal(0, 1, size=self.num_opinions)))
 
     
+    def attraction_repulsion(self, a1, a2, threshold=None):
+        """
+        Update agent a1 and a2's opinions according to the attraction-repulsion model.
+        """
+        if not threshold:
+            threshold = self.initial_threshold
+
+        d = np.linalg.norm(a1.opinion - a2.opinion)
+        interaction_probability = (1/2)**(d / self.exposure)
+        if self.random.random() < interaction_probability:
+            if d < threshold:
+                a1.opinion = self.bounded_update(a1.opinion + (a2.opinion / self.responsiveness))
+            else:
+                a1.opinion = self.bounded_update(a1.opinion - (a2.opinion / self.responsiveness))
+
+
+
     def k_mean(self, **kwargs):
         """
         Update a1 (candidate) opinion to be the mean of their voting bloc
@@ -543,7 +527,7 @@ class ElectionSystem(mesa.Model):
             voting_bloc = [voter for voter in voters if voter.voted_for == candidate.unique_id]
             if len(voting_bloc) > 0:
                 opinion_sum = sum([voter.opinion for voter in voting_bloc])
-                candidate.opinion =  np.array(opinion_sum / len(voting_bloc))
+                candidate.opinion =  self.bounded_update(np.array(opinion_sum / len(voting_bloc)))
             else:
                 return
         else:
@@ -566,10 +550,16 @@ class ElectionSystem(mesa.Model):
 
         # update candidates positions with gradients
         for candidate_index, candidate in zip(range(len(self.agents[Candidate])), candidates):
-            candidate_opinions.grad = None
             expected_votes[candidate_index].backward(retain_graph=True)
-            gain = candidate_opinions.grad
-            candidate.opinion += self.learning_rate * np.array(gain[candidate_index])
+            gains = candidate_opinions.grad
+            gain = np.array(gains[candidate_index])
+
+            # check if gradient is NaN
+            if not np.isnan(gain).any():
+                candidate.opinion = self.bounded_update(candidate.opinion + (self.learning_rate * gain))
+            
+            # zero out gradient for next candidate
+            candidate_opinions.grad.zero_()
 
 
     def plurality_objective_fn(self, X, y):
@@ -689,4 +679,13 @@ class ElectionSystem(mesa.Model):
             normalized_value = ((score - min_score) / (max_score - min_score)) * (self.num_candidates_to_benefit - (-self.num_candidates_to_benefit)) + (-self.num_candidates_to_benefit)
             normalized_scores.append(normalized_value)
         return normalized_scores
+    
+
+    def bounded_update(self, update):
+        """
+        Return the the opinion update subject to the opinion space bounds.
+        """
+        max_update = np.minimum(update, np.ones(self.num_opinions))
+        min_update = np.maximum(max_update, np.zeros(self.num_opinions))
+        return min_update
 

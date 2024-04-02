@@ -3,73 +3,37 @@ import os
 from tqdm import tqdm
 
 def main():
-    params = {
-            'num_voters': 10,
-            'num_voters_to_activate': 1,
-            'initial_num_candidates': 3,
-            'min_candidates': 3,
-            'max_candidates': 5,
-            'num_candidates_to_activate': 3, # since num candidates changes, activates no more than this number
-            'term_limit': 2,
-            'num_opinions': 3,
-            'election_system': 'rc', # plurality, rc, score
-            'voter_voter_interaction_fn': 'bc', # avg, bc
-            'voter_candidate_interaction_fn': 'bc', # avg, bc
-            'candidate_voter_interaction_fn': 'avg', # avg, bc, kmean, ascent
-            'candidate_candidate_interaction_fn': None,
-            'initial_exit_probability': 0.33,
-            'exit_probability_decrease_factor': 0.25,     
-            'initial_threshold': 0.2,
-            'threshold_increase_factor': 0.25,
-            'num_candidates_to_benefit': 2,
-            'num_rounds_before_election': 3,
-            'mu': 0.5,
-            'radius': 0.2,
-            'beta': 0.2,
-            'C': 0.2,
-            'second_choice_weight_factor': 0.1
-        }
-
-    model = build_model(params)
-    run_model(model, time_steps=15)
-    save_data(model)
-
-
-def build_model(params):
-    """
-    THINGS WE WANT TO BE MODULAR (I.E. WE CAN CONTROL THROUGH PARAMETERS)
-        - the election system (plurality, ranked choice, cardinal)
-        - the method for agents to find other agents to interact with
-    """
-
     model = ElectionSystem(
-        seed=0,
-        num_voters=params['num_voters'],
-        initial_num_candidates=params['initial_num_candidates'],
-        term_limit=params['term_limit'],
-        num_opinions=params['num_opinions'],
-        election_system=params['election_system'],
-        voter_voter_interaction_fn=params['voter_voter_interaction_fn'],
-        voter_candidate_interaction_fn=params['voter_candidate_interaction_fn'],
-        candidate_voter_interaction_fn=params['candidate_voter_interaction_fn'],
-        candidate_candidate_interaction_fn=params['candidate_candidate_interaction_fn'],
-        num_voters_to_activate=params['num_voters_to_activate'],
-        num_candidates_to_activate=params['num_candidates_to_activate'],
-        initial_exit_probability=params['initial_exit_probability'],
-        exit_probability_decrease_factor=params['exit_probability_decrease_factor'],
-        min_candidates=params['min_candidates'],
-        max_candidates=params['max_candidates'],
-        initial_threshold=params['initial_threshold'],
-        threshold_increase_factor=params['threshold_increase_factor'],
-        num_candidates_to_benefit=params['num_candidates_to_benefit'],
-        mu=params['mu'],
-        num_rounds_before_election=params['num_rounds_before_election'],
-        radius=params['radius'],
-        beta=params['beta'],
-        C=params['C'],
-        second_choice_weight_factor=params['second_choice_weight_factor']
+        #seed=0,
+        num_voters=100,
+        num_voters_to_activate=1,
+        initial_num_candidates=3,
+        min_candidates=3,
+        max_candidates=5,
+        term_limit=2,
+        num_opinions=1,
+        election_system='plurality', # plurality, rc, score
+        voter_voter_interaction_fn='ar', # avg, bc, bc1, ar
+        voter_candidate_interaction_fn='ar', # avg, bc, bc1, ar
+        voter_noise_factor=0.01,
+        initial_exit_probability=0.33,
+        exit_probability_decrease_factor=0.25,     
+        initial_threshold=0.2,
+        threshold_increase_factor=0.1,
+        num_candidates_to_benefit=2,
+        num_rounds_before_election=10,
+        mu=0.5, # mu in bounded confidence (controls magnitude of opinion update)
+        radius=0.1, # r in radius of support function (controls inflection point)
+        learning_rate=0.001, # learning rate for candidate gradient ascent
+        gamma=10, # gamma in radius of support function (controls steepness which is effectively variation in voting probabilities)
+        beta=1,
+        second_choice_weight_factor=0.5,
+        exposure=0.2,
+        responsiveness=0.25
     )
-    return model
+
+    run_model(model, time_steps=10000)
+    save_data(model)
 
 
 def run_model(model, time_steps):
