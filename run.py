@@ -21,30 +21,30 @@ def big_boy_sweeps():
 
     default_params = {
         #seed:0,
-        'num_steps': 100, # number of model steps
-        'num_runs': 2, # number of runs to average variance for
-        'num_voters': 100,
+        'num_steps': 100000, # number of model steps
+        'num_runs': 100, # number of runs to average variance for
+        'num_voters': 250,
         'num_voters_to_activate': 1,
         'initial_num_candidates': 3,
         'min_candidates': 3,
         'max_candidates': 5,
         'term_limit': 2,
         'num_opinions': 1,
-        'voter_noise_factor': 0.01,
+        'voter_noise_factor': 0.001,
         'initial_exit_probability': 0.33,
         'exit_probability_decrease_factor': 0.25,     
-        'initial_threshold': 0.2,
+        'initial_threshold': 0.3,
         'threshold_increase_factor': 0.1,
         'num_candidates_to_benefit': 2,
-        'num_rounds_before_election': 10,
-        'mu': 0.5, # mu in bounded confidence (controls magnitude of opinion update)
+        'num_rounds_before_election': 1000,
+        'mu': 0.25, # mu in bounded confidence (controls magnitude of opinion update)
         'radius': 0.1, # r in radius of support function (controls inflection point)
-        'learning_rate': 0.001, # learning rate for candidate gradient ascent
+        'learning_rate': 0.000001, # learning rate for candidate gradient ascent
         'gamma': 10, # gamma in radius of support function (controls steepness which is effectively variation in voting probabilities)
         'beta': 1,
         'second_choice_weight_factor': 0.5,
-        'exposure': 0.2,
-        'responsiveness': 0.25
+        'exposure': 0.2, # E in AR model (controls probability of interacting)
+        'responsiveness': 0.25 # R in AR model (controls magnitude of opinion update)
     }
 
     # SWEEPS for EXIT PROBABLITY DECREASE FACTOR and THRESHOLD INCREASE FACTOR
@@ -229,14 +229,14 @@ def sweep_exit_probability_decrease_threshold_increase(v_v_interaction_fn, v_c_i
     """
 
     # number of parameter combinations
-    start = 0.01
+    start = 0.001
     stop = 1
-    num_combos = 2
+    num_combos = 1000
 
     exit_probability_decrease_list = np.linspace(start, stop, num_combos, endpoint=False)
     threshold_increase_list = np.linspace(start, stop, num_combos, endpoint=False)
-    exit_probability_decrease_list = np.round(exit_probability_decrease_list, decimals=4)
-    threshold_increase_list = np.round(threshold_increase_list, decimals=4)
+    exit_probability_decrease_list = np.round(exit_probability_decrease_list, decimals=5)
+    threshold_increase_list = np.round(threshold_increase_list, decimals=5)
     var_df = pd.DataFrame(columns=['exit_probability_decrease_factor', 'threshold_increase_factor', 'variance'])
 
     for exit_pr in exit_probability_decrease_list:
@@ -280,10 +280,11 @@ def sweep_exit_probability_decrease_threshold_increase(v_v_interaction_fn, v_c_i
                 agent_data = model.datacollector.get_agent_vars_dataframe()
                 last_step = agent_data.index.get_level_values("Step").max()
                 end_opinion_var = agent_data.xs(last_step, level="Step")["opinion1"].var()
+                print(float(end_opinion_var))
                 run_df.loc[run_df.shape[0]] = [run, float(end_opinion_var)]
 
             # add the average variance over all runs for that parameter combo to var_df
-            var_df.loc[var_df.shape[0]] = [exit_pr, threshold, run_df['run'].mean()]
+            var_df.loc[var_df.shape[0]] = [exit_pr, threshold, run_df['variance'].mean()]
 
     output_directory = 'sweeps'
     run_type = f"{v_v_interaction_fn}-{election_system}"
@@ -297,14 +298,14 @@ def sweep_gamma_beta(v_v_interaction_fn, v_c_interaction_fn, election_system, de
     """
 
     # number of parameter combinations
-    start = 0.01
+    start = 0.001
     stop = 1
-    num_combos = 2
+    num_combos = 1000
 
     gamma_list = np.linspace(start, stop, num_combos, endpoint=False)
     beta_list = np.linspace(start, stop, num_combos, endpoint=False)
-    gamma_list = np.round(gamma_list, decimals=4)
-    beta_list = np.round(beta_list, decimals=4)
+    gamma_list = np.round(gamma_list, decimals=5)
+    beta_list = np.round(beta_list, decimals=5)
     var_df = pd.DataFrame(columns=['gamma', 'beta', 'variance'])
 
     for gamma in gamma_list:
@@ -351,7 +352,7 @@ def sweep_gamma_beta(v_v_interaction_fn, v_c_interaction_fn, election_system, de
                 run_df.loc[run_df.shape[0]] = [run, float(end_opinion_var)]
 
             # add the average variance over all runs for that parameter combo to var_df
-            var_df.loc[var_df.shape[0]] = [gamma, beta, run_df['run'].mean()]
+            var_df.loc[var_df.shape[0]] = [gamma, beta, run_df['variance'].mean()]
 
     output_directory = 'sweeps'
     run_type = f"{v_v_interaction_fn}-{election_system}"
@@ -365,14 +366,14 @@ def sweep_radius_second_choice_weight(v_v_interaction_fn, v_c_interaction_fn, el
     """
 
     # number of parameter combinations
-    start = 0.01
+    start = 0.001
     stop = 1
-    num_combos = 2
+    num_combos = 1000
 
     radius_list = np.linspace(start, stop, num_combos, endpoint=False)
     second_choice_weight_list = np.linspace(start, stop, num_combos, endpoint=False)
-    radius_list = np.round(radius_list, decimals=4)
-    second_choice_weight_list = np.round(second_choice_weight_list, decimals=4)
+    radius_list = np.round(radius_list, decimals=5)
+    second_choice_weight_list = np.round(second_choice_weight_list, decimals=5)
     var_df = pd.DataFrame(columns=['radius', 'second_choice_weight', 'variance'])
 
     for radius in radius_list:
@@ -419,7 +420,7 @@ def sweep_radius_second_choice_weight(v_v_interaction_fn, v_c_interaction_fn, el
                 run_df.loc[run_df.shape[0]] = [run, float(end_opinion_var)]
 
             # add the average variance over all runs for that parameter combo to var_df
-            var_df.loc[var_df.shape[0]] = [radius, weight, run_df['run'].mean()]
+            var_df.loc[var_df.shape[0]] = [radius, weight, run_df['variance'].mean()]
 
     output_directory = 'sweeps'
     run_type = f"{v_v_interaction_fn}-{election_system}"
@@ -445,7 +446,7 @@ def make_heatmap(df_path, output_dir, file_name, param1, param2, xlab=None, ylab
     df = pd.read_csv(df_path)
 
     # make heatmap
-    sns.heatmap(data=df.pivot(param1, param2, 'variance'), cmap='rocket')
+    sns.heatmap(data=df.pivot(columns=param1, index=param2, values='variance'), cmap='rocket')
 
     # set labels
     if xlab:

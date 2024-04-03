@@ -1,5 +1,5 @@
-Job ID: 3426
-Node: node021 echo Starting: 04/03/24 18:23:10
+Job ID: 3432
+Node: node021 echo Starting: 04/03/24 19:32:46
 /storage/homes/jhackney/thesis-election-systems/election-system-polarization/.venv/lib64/python3.9/site-packages/networkx/utils/backends.py:135: RuntimeWarning: networkx backend defined more than once: nx-loopback
   backends.update(_get_backends("networkx.backends"))
 /storage/homes/jhackney/thesis-election-systems/election-system-polarization/.venv/lib64/python3.9/site-packages/mesa/time.py:82: FutureWarning: The AgentSet is experimental. It may be changed or removed in any and all future releases, including patch releases.

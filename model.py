@@ -511,9 +511,9 @@ class ElectionSystem(mesa.Model):
         interaction_probability = (1/2)**(d / self.exposure)
         if self.random.random() < interaction_probability:
             if d < threshold:
-                a1.opinion = self.bounded_update(a1.opinion + (a2.opinion / self.responsiveness))
+                a1.opinion = self.bounded_update(a1.opinion + ((a2.opinion - a1.opinion) * self.responsiveness))
             else:
-                a1.opinion = self.bounded_update(a1.opinion - (a2.opinion / self.responsiveness))
+                a1.opinion = self.bounded_update(a1.opinion - ((a2.opinion - a1.opinion) * self.responsiveness))
 
 
 

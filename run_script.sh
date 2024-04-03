@@ -3,12 +3,12 @@
 # Set SLURM options
 
 #SBATCH --job-name=election_simulation # job name
-#SBATCH --output=election_simulation-%j.out # standard output and error log
+#SBATCH --output=logs/election_simulation-%j.out # standard output and error log
 #SBATCH --mail-user=jhackney@middlebury.edu # where to send mail
 #SBATCH --mail-type=ALL # mail events (NONE, BEGIN, END, FAIL, ALL)
-#SBATCH --mem=12gb # job memory request 
+#SBATCH --mem=24gb # job memory request 
 #SBATCH --partition=standard # partition (queue) 
-#SBATCH --time=02:00:00 # time limit hrs:min:sec 
+#SBATCH --time=24:00:00 # time limit hrs:min:sec 
 
 # print SLURM envirionment variables
 echo "Job ID: ${SLURM_JOB_ID}"
