@@ -5,7 +5,7 @@ from tqdm import tqdm
 def main():
     model = ElectionSystem(
         #seed=0,
-        num_voters=100,
+        num_voters=250,
         num_voters_to_activate=1,
         initial_num_candidates=3,
         min_candidates=3,
@@ -15,24 +15,24 @@ def main():
         election_system='plurality', # plurality, rc, score
         voter_voter_interaction_fn='ar', # avg, bc, bc1, ar
         voter_candidate_interaction_fn='ar', # avg, bc, bc1, ar
-        voter_noise_factor=0.01,
+        voter_noise_factor=0.001,
         initial_exit_probability=0.33,
         exit_probability_decrease_factor=0.25,     
-        initial_threshold=0.2,
+        initial_threshold=0.3,
         threshold_increase_factor=0.1,
         num_candidates_to_benefit=2,
-        num_rounds_before_election=10,
-        mu=0.5, # mu in bounded confidence (controls magnitude of opinion update)
+        num_rounds_before_election=350,
+        mu=0.25, # mu in bounded confidence (controls magnitude of opinion update)
         radius=0.1, # r in radius of support function (controls inflection point)
-        learning_rate=0.001, # learning rate for candidate gradient ascent
+        learning_rate=0.000001, # learning rate for candidate gradient ascent
         gamma=10, # gamma in radius of support function (controls steepness which is effectively variation in voting probabilities)
         beta=1,
         second_choice_weight_factor=0.5,
-        exposure=0.2,
-        responsiveness=0.25
+        exposure=0.2, # E in AR model (controls probability of interacting)
+        responsiveness=0.25 # R in AR model (controls magnitude of opinion update)
     )
 
-    run_model(model, time_steps=10000)
+    run_model(model, time_steps=5000)
     save_data(model)
 
 

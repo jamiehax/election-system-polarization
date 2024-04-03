@@ -21,10 +21,10 @@ def main():
         os.makedirs(final_directory)
 
     # PLOT PARAMETER SWEEP
-    parameter_sweep()
+    # parameter_sweep()
 
     # PLOT AGENT LOCATIONS IN 1D
-    #agent_locations_1d(agent_data)
+    agent_locations_1d(agent_data)
 
     # PLOT OPINION VARIANCE IN 1D
     #opinion_variance_1d(agent_data_bc, agent_data_avg, 3000)
