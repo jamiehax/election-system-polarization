@@ -242,7 +242,7 @@ def sweep_exit_probability_decrease_threshold_increase(v_v_interaction_fn, v_c_i
     for exit_pr in exit_probability_decrease_list:
         for threshold in threshold_increase_list:
             run_df = pd.DataFrame(columns=['run', 'variance'])
-            for run in default_params['num_runs']:
+            for run in range(default_params['num_runs']):
                 model = ElectionSystem(
                         #seed=default_params['seed'],
                         num_voters=default_params['num_voters'],
@@ -278,8 +278,9 @@ def sweep_exit_probability_decrease_threshold_increase(v_v_interaction_fn, v_c_i
 
                 # add variance of this run to run_df
                 agent_data = model.datacollector.get_agent_vars_dataframe()
-                variance = float(agent_data.loc[agent_data['Step'] == default_params['num_steps']][['opinion1']].var())
-                run_df.loc[run_df.shape[0]] = [run, variance]
+                last_step = agent_data.index.get_level_values("Step").max()
+                end_opinion_var = agent_data.xs(last_step, level="Step")["opinion1"].var()
+                run_df.loc[run_df.shape[0]] = [run, float(end_opinion_var)]
 
             # add the average variance over all runs for that parameter combo to var_df
             var_df.loc[var_df.shape[0]] = [exit_pr, threshold, run_df['run'].mean()]
@@ -309,7 +310,7 @@ def sweep_gamma_beta(v_v_interaction_fn, v_c_interaction_fn, election_system, de
     for gamma in gamma_list:
         for beta in beta_list:
             run_df = pd.DataFrame(columns=['run', 'variance'])
-            for run in default_params['num_runs']:
+            for run in range(default_params['num_runs']):
                 model = ElectionSystem(
                         #seed=default_params['seed'],
                         num_voters=default_params['num_voters'],
@@ -345,8 +346,9 @@ def sweep_gamma_beta(v_v_interaction_fn, v_c_interaction_fn, election_system, de
 
                 # add variance of this run to run_df
                 agent_data = model.datacollector.get_agent_vars_dataframe()
-                variance = float(agent_data.loc[agent_data['Step'] == default_params['num_steps']][['opinion1']].var())
-                run_df.loc[run_df.shape[0]] = [run, variance]
+                last_step = agent_data.index.get_level_values("Step").max()
+                end_opinion_var = agent_data.xs(last_step, level="Step")["opinion1"].var()
+                run_df.loc[run_df.shape[0]] = [run, float(end_opinion_var)]
 
             # add the average variance over all runs for that parameter combo to var_df
             var_df.loc[var_df.shape[0]] = [gamma, beta, run_df['run'].mean()]
@@ -376,7 +378,7 @@ def sweep_radius_second_choice_weight(v_v_interaction_fn, v_c_interaction_fn, el
     for radius in radius_list:
         for weight in second_choice_weight_list:
             run_df = pd.DataFrame(columns=['run', 'variance'])
-            for run in default_params['num_runs']:
+            for run in range(default_params['num_runs']):
                 model = ElectionSystem(
                         #seed=default_params['seed'],
                         num_voters=default_params['num_voters'],
@@ -412,8 +414,9 @@ def sweep_radius_second_choice_weight(v_v_interaction_fn, v_c_interaction_fn, el
 
                 # add variance of this run to run_df
                 agent_data = model.datacollector.get_agent_vars_dataframe()
-                variance = float(agent_data.loc[agent_data['Step'] == default_params['num_steps']][['opinion1']].var())
-                run_df.loc[run_df.shape[0]] = [run, variance]
+                last_step = agent_data.index.get_level_values("Step").max()
+                end_opinion_var = agent_data.xs(last_step, level="Step")["opinion1"].var()
+                run_df.loc[run_df.shape[0]] = [run, float(end_opinion_var)]
 
             # add the average variance over all runs for that parameter combo to var_df
             var_df.loc[var_df.shape[0]] = [radius, weight, run_df['run'].mean()]
