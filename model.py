@@ -116,7 +116,7 @@ class ElectionSystem(mesa.Model):
         self.winner = None
         self.voters_to_activate = []
         self.candidates_to_activate = []
-        self.agents = {}
+        self.agent_set = {}
         self.schedule = mesa.time.StagedActivation(
             self,
             stage_list=['voters_move'],
@@ -170,7 +170,7 @@ class ElectionSystem(mesa.Model):
         self.candidate_objective_fn = objective_functions[election_system]
 
         # initialize voters
-        self.agents[Voter] = []
+        self.agent_set[Voter] = []
         for i in range(self.num_voters):
             # get initial voter opinion and location
             opinion = np.array([self.random.uniform(0, 1) for _ in range(self.num_opinions)])
@@ -185,10 +185,10 @@ class ElectionSystem(mesa.Model):
                 self.interaction_functions.get(voter_candidate_interaction_fn, None)
             )
             self.schedule.add(voter)
-            self.agents[Voter].append(voter)
+            self.agent_set[Voter].append(voter)
 
         # initialize candidates
-        self.agents[Candidate] = []
+        self.agent_set[Candidate] = []
         for i in range(self.num_voters, self.num_agents):
             # get initial candidate opinion and location
             opinion = np.array([self.random.uniform(0, 1) for _ in range(self.num_opinions)])
@@ -202,7 +202,7 @@ class ElectionSystem(mesa.Model):
                 initial_exit_probability
             )
             self.schedule.add(candidate)
-            self.agents[Candidate].append(candidate)
+            self.agent_set[Candidate].append(candidate)
             self.candidate_index += 1
 
 
@@ -239,7 +239,7 @@ class ElectionSystem(mesa.Model):
         """
 
         # randomly select agents to interact
-        self.voters_to_activate = self.random.sample([a.unique_id for a in self.agents[Voter]], self.num_voters_to_activate)
+        self.voters_to_activate = self.random.sample([a.unique_id for a in self.agent_set[Voter]], self.num_voters_to_activate)
 
         # move voters
         self.schedule.step()
@@ -251,7 +251,7 @@ class ElectionSystem(mesa.Model):
         if self.schedule.steps % self.num_rounds_before_election == 0:
 
             # clear old winner
-            if self.winner: next((candidate for candidate in self.agents[Candidate] if candidate is self.winner), None).is_winner = False
+            if self.winner: next((candidate for candidate in self.agent_set[Candidate] if candidate is self.winner), None).is_winner = False
             self.winner = None
 
             # remove term limit candidates:
@@ -274,9 +274,9 @@ class ElectionSystem(mesa.Model):
         """
         Remove all candidates who have hit their term limit
         """
-        for candidate in self.agents[Candidate]:
+        for candidate in self.agent_set[Candidate]:
             if candidate.num_wins >= self.term_limit:
-                self.agents[Candidate].remove(candidate)
+                self.agent_set[Candidate].remove(candidate)
                 self.schedule.remove(candidate)
 
 
@@ -285,7 +285,7 @@ class ElectionSystem(mesa.Model):
         Stochastically remove candidates based on their exit probabilities, winner candidate is excluded.
         Stochastically add candidates into the race, satisfying min and max candidate requirements.
         """
-        candidates = self.agents[Candidate].copy()
+        candidates = self.agent_set[Candidate].copy()
         self.random.shuffle(candidates)
 
         # randomly remove candidates based on their exit probability, but not fewer than min num of candidates
@@ -294,7 +294,7 @@ class ElectionSystem(mesa.Model):
                 if len(candidates) >= self.min_candidates:
                     if self.random.random() < candidate.exit_probability:
                         candidates.remove(candidate)
-                        self.agents[Candidate].remove(candidate)
+                        self.agent_set[Candidate].remove(candidate)
                         self.schedule.remove(candidate)
 
         # randomly add candidates to satisfy min max restraints
@@ -316,7 +316,7 @@ class ElectionSystem(mesa.Model):
                 self.initial_exit_probability
             )
             self.schedule.add(candidate)
-            self.agents[Candidate].append(candidate)
+            self.agent_set[Candidate].append(candidate)
             self.candidate_index += 1
 
 
@@ -324,8 +324,8 @@ class ElectionSystem(mesa.Model):
         """
         Returns the winner of the election for plurality count, and resets all candidate vote counts.
         """
-        candidates = self.agents[Candidate]
-        voters = self.agents[Voter]
+        candidates = self.agent_set[Candidate]
+        voters = self.agent_set[Voter]
 
         # tensor of each voters probaility of voting for each candidate
         voter_opinions = torch.stack([torch.tensor(v.opinion) for v in voters])
@@ -366,8 +366,8 @@ class ElectionSystem(mesa.Model):
         """
 
         # create copy lists to remove candidates from during election rounds
-        candidates = self.agents[Candidate].copy()
-        voters = self.agents[Voter].copy()
+        candidates = self.agent_set[Candidate].copy()
+        voters = self.agent_set[Voter].copy()
 
         # tensor of each voters probaility of voting for each candidate
         voter_opinions = torch.stack([torch.tensor(v.opinion) for v in voters])
@@ -423,8 +423,8 @@ class ElectionSystem(mesa.Model):
         """
         Returns the winner of the election according to score voting.
         """
-        candidates = self.agents[Candidate]
-        voters = self.agents[Voter]
+        candidates = self.agent_set[Candidate]
+        voters = self.agent_set[Voter]
 
         # tensor of each voters probaility of voting for each candidate
         voter_opinions = torch.stack([torch.tensor(v.opinion) for v in voters])
@@ -459,7 +459,7 @@ class ElectionSystem(mesa.Model):
         # normalize scores and change exit probabilities and thresholds
         results = [(candidate, score) for candidate, score in scores.items()]
         for candidate, score in results:
-            normalized_score = len(self.agents[Candidate]) - ((score - min(scores.values())) / (max(scores.values()) - min(scores.values())) * len(self.agents[Candidate]))
+            normalized_score = len(self.agent_set[Candidate]) - ((score - min(scores.values())) / (max(scores.values()) - min(scores.values())) * len(self.agent_set[Candidate]))
             candidate.exit_probability = self.sigmoid_offset(self.exit_probability_decrease_factor * (normalized_score - self.num_candidates_to_benefit), candidate.exit_probability)
             candidate.threshold = self.sigmoid_offset(self.threshold_increase_factor * (self.num_candidates_to_benefit - normalized_score), candidate.threshold)
 
@@ -523,7 +523,7 @@ class ElectionSystem(mesa.Model):
         """
         candidate = kwargs.get('a1', None)
         if isinstance(candidate, Candidate):
-            voters = self.agents[Voter]
+            voters = self.agent_set[Voter]
             voting_bloc = [voter for voter in voters if voter.voted_for == candidate.unique_id]
             if len(voting_bloc) > 0:
                 opinion_sum = sum([voter.opinion for voter in voting_bloc])
@@ -540,16 +540,16 @@ class ElectionSystem(mesa.Model):
         """
 
         # get tensors of voters and candidate opinions
-        voter_opinions = torch.stack([torch.tensor(v.opinion) for v in self.agents[Voter]])
+        voter_opinions = torch.stack([torch.tensor(v.opinion) for v in self.agent_set[Voter]])
         voter_opinions.requires_grad_(True)
-        candidate_opinions = torch.stack([torch.tensor(c.opinion) for c in self.agents[Candidate]])
-        candidates = [c for c in self.agents[Candidate]] # list of candidates in same order as gradients
+        candidate_opinions = torch.stack([torch.tensor(c.opinion) for c in self.agent_set[Candidate]])
+        candidates = [c for c in self.agent_set[Candidate]] # list of candidates in same order as gradients
         candidate_opinions.requires_grad_(True)
         
         expected_votes = self.candidate_objective_fn(voter_opinions, candidate_opinions)
 
         # update candidates positions with gradients
-        for candidate_index, candidate in zip(range(len(self.agents[Candidate])), candidates):
+        for candidate_index, candidate in zip(range(len(self.agent_set[Candidate])), candidates):
             expected_votes[candidate_index].backward(retain_graph=True)
             gains = candidate_opinions.grad
             gain = np.array(gains[candidate_index])
@@ -639,15 +639,15 @@ class ElectionSystem(mesa.Model):
 
         returns: {"AgentType": [Agent1, Agent2, ..., AgentN]}
         """
-        candidates = self.agents[Candidate]
-        voters = self.agents[Voter]
+        candidates = self.agent_set[Candidate]
+        voters = self.agent_set[Voter]
 
-        if num_candidates == self.agents[Candidate]:
+        if num_candidates == self.agent_set[Candidate]:
             interaction_candidates = candidates
         else:
             interaction_candidates = self.random.sample(candidates, num_candidates)
         
-        if num_voters == self.agents[Voter]:
+        if num_voters == self.agent_set[Voter]:
             interaction_voters = candidates
         else:
             interaction_voters = self.random.sample(voters, num_voters)

@@ -22,7 +22,7 @@ def big_boy_sweeps():
     default_params = {
         #seed:0,
         'num_steps': 100, # number of model steps
-        'num_runs': 10, # number of runs to average variance for
+        'num_runs': 2, # number of runs to average variance for
         'num_voters': 100,
         'num_voters_to_activate': 1,
         'initial_num_candidates': 3,
@@ -231,7 +231,7 @@ def sweep_exit_probability_decrease_threshold_increase(v_v_interaction_fn, v_c_i
     # number of parameter combinations
     start = 0.01
     stop = 1
-    num_combos = 99
+    num_combos = 2
 
     exit_probability_decrease_list = np.linspace(start, stop, num_combos, endpoint=False)
     threshold_increase_list = np.linspace(start, stop, num_combos, endpoint=False)
@@ -299,7 +299,7 @@ def sweep_gamma_beta(v_v_interaction_fn, v_c_interaction_fn, election_system, de
     # number of parameter combinations
     start = 0.01
     stop = 1
-    num_combos = 99
+    num_combos = 2
 
     gamma_list = np.linspace(start, stop, num_combos, endpoint=False)
     beta_list = np.linspace(start, stop, num_combos, endpoint=False)
@@ -325,9 +325,9 @@ def sweep_gamma_beta(v_v_interaction_fn, v_c_interaction_fn, election_system, de
                         voter_candidate_interaction_fn=v_c_interaction_fn, # varied by run
                         voter_noise_factor=default_params['voter_noise_factor'],
                         initial_exit_probability=default_params['initial_exit_probability'],
-                        exit_probability_decrease_factor=default_params['exit_pr'],
+                        exit_probability_decrease_factor=default_params['exit_probability_decrease_factor'],
                         initial_threshold=default_params['initial_threshold'],
-                        threshold_increase_factor=default_params['threshold'],
+                        threshold_increase_factor=default_params['threshold_increase_factor'],
                         num_candidates_to_benefit=default_params['num_candidates_to_benefit'],
                         num_rounds_before_election=default_params['num_rounds_before_election'],
                         mu=default_params['mu'],
@@ -367,7 +367,7 @@ def sweep_radius_second_choice_weight(v_v_interaction_fn, v_c_interaction_fn, el
     # number of parameter combinations
     start = 0.01
     stop = 1
-    num_combos = 99
+    num_combos = 2
 
     radius_list = np.linspace(start, stop, num_combos, endpoint=False)
     second_choice_weight_list = np.linspace(start, stop, num_combos, endpoint=False)
@@ -393,9 +393,9 @@ def sweep_radius_second_choice_weight(v_v_interaction_fn, v_c_interaction_fn, el
                         voter_candidate_interaction_fn=v_c_interaction_fn, # varied by run
                         voter_noise_factor=default_params['voter_noise_factor'],
                         initial_exit_probability=default_params['initial_exit_probability'],
-                        exit_probability_decrease_factor=default_params['exit_pr'],
+                        exit_probability_decrease_factor=default_params['exitexit_probability_decrease_factor_pr'],
                         initial_threshold=default_params['initial_threshold'],
-                        threshold_increase_factor=default_params['threshold'],
+                        threshold_increase_factor=default_params['threshold_increase_factor'],
                         num_candidates_to_benefit=default_params['num_candidates_to_benefit'],
                         num_rounds_before_election=default_params['num_rounds_before_election'],
                         mu=default_params['mu'],
