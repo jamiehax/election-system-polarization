@@ -393,7 +393,7 @@ def sweep_radius_second_choice_weight(v_v_interaction_fn, v_c_interaction_fn, el
                         voter_candidate_interaction_fn=v_c_interaction_fn, # varied by run
                         voter_noise_factor=default_params['voter_noise_factor'],
                         initial_exit_probability=default_params['initial_exit_probability'],
-                        exit_probability_decrease_factor=default_params['exitexit_probability_decrease_factor_pr'],
+                        exit_probability_decrease_factor=default_params['exit_probability_decrease_factor'],
                         initial_threshold=default_params['initial_threshold'],
                         threshold_increase_factor=default_params['threshold_increase_factor'],
                         num_candidates_to_benefit=default_params['num_candidates_to_benefit'],

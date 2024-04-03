@@ -1,0 +1,18 @@
+Job ID: 3425
+Node: node021 echo Starting: 04/03/24 18:21:12
+/storage/homes/jhackney/thesis-election-systems/election-system-polarization/.venv/lib64/python3.9/site-packages/networkx/utils/backends.py:135: RuntimeWarning: networkx backend defined more than once: nx-loopback
+  backends.update(_get_backends("networkx.backends"))
+/storage/homes/jhackney/thesis-election-systems/election-system-polarization/.venv/lib64/python3.9/site-packages/mesa/time.py:82: FutureWarning: The AgentSet is experimental. It may be changed or removed in any and all future releases, including patch releases.
+We would love to hear what you think about this new feature. If you have any thoughts, share them with us here: https://github.com/projectmesa/mesa/discussions/1919
+  self._agents: AgentSet = AgentSet(agents, model)
+Traceback (most recent call last):
+  File "/storage/homes/jhackney/thesis-election-systems/election-system-polarization/run.py", line 566, in <module>
+    main()
+  File "/storage/homes/jhackney/thesis-election-systems/election-system-polarization/run.py", line 11, in main
+    big_boy_sweeps()
+  File "/storage/homes/jhackney/thesis-election-systems/election-system-polarization/run.py", line 116, in big_boy_sweeps
+    sweep_radius_second_choice_weight(
+  File "/storage/homes/jhackney/thesis-election-systems/election-system-polarization/run.py", line 396, in sweep_radius_second_choice_weight
+    exit_probability_decrease_factor=default_params['exitexit_probability_decrease_factor_pr'],
+KeyError: 'exitexit_probability_decrease_factor_pr'
+Ending: 04/03/24 18:21:42
