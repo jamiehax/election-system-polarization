@@ -46,7 +46,7 @@ def parameter_sweep():
         os.makedirs(final_directory)
 
     # sweep data frame
-    num_sweeps = 9
+    num_sweeps = 18
     responsiveness_list = np.linspace(0.1, 1, num_sweeps, endpoint=False)
     tolerance_list = np.linspace(0.1, 1, num_sweeps, endpoint=False)
     responsiveness_list = np.round(responsiveness_list, decimals=2)
@@ -91,17 +91,13 @@ def parameter_sweep():
                     responsiveness=responsiveness
                 )
 
-
-            print(f"trying with parameters: responsiveness: {responsiveness}, threshold: {tolerance}")
             num_steps = 100
             for _ in range(num_steps):
                 model.step()
 
-
             save_data(model)
 
             agent_data = pd.read_csv('data/agent_data.csv')
-
             variance = float(agent_data.loc[agent_data['Step'] == num_steps][['opinion1']].var())
             df.loc[df.shape[0]] = [responsiveness, tolerance, variance]
 
@@ -113,8 +109,6 @@ def parameter_sweep():
 
     # save plot
     plt.savefig('visualizations/sweeps/sweep.png')
-
-
 
 
 
