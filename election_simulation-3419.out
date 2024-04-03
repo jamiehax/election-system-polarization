@@ -1,0 +1,13 @@
+Job ID: 3419
+Node: node021 echo Starting: 04/03/24 16:31:45
+Traceback (most recent call last):
+  File "/storage/homes/jhackney/thesis-election-systems/election-system-polarization/run.py", line 1, in <module>
+    from model import ElectionSystem
+  File "/storage/homes/jhackney/thesis-election-systems/election-system-polarization/model.py", line 4, in <module>
+    import torch
+  File "/home/jhackney/.local/lib/python3.9/site-packages/torch/__init__.py", line 1403, in <module>
+    from .serialization import save, load
+  File "/home/jhackney/.local/lib/python3.9/site-packages/torch/serialization.py", line 18, in <module>
+    from typing_extensions import TypeAlias  # Python 3.10+
+ModuleNotFoundError: No module named 'typing_extensions'
+Ending: 04/03/24 16:31:49

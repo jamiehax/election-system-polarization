@@ -37,7 +37,7 @@ def main():
     # opinion_variance(agent_data, time_steps=10000)
 
 
-def parameter_sweep():
+def parameter_sweep(model):
 
     # create sweeps output directory
     current_directory = os.getcwd()
