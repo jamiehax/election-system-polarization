@@ -20,6 +20,12 @@ class Voter(mesa.Agent):
         self.candidate_interaction_fn = candidate_interaction_fn
         self.get_interaction_agents = self.model.get_random_agent_set
 
+        # these are canddiate attributes that need to be set so model is pickleable
+        self.num_votes = None
+        self.is_winner = None
+        self.num_wins = None
+        self.exit_probability = None
+
 
     def voters_move(self):
         """
@@ -100,7 +106,8 @@ class ElectionSystem(mesa.Model):
         second_choice_weight_factor = kwargs.get('second_choice_weight_factor', 0.1)
         voter_noise_factor = kwargs.get('voter_noise_factor', 0)
         exposure = kwargs.get('exposure', 0.5)
-        responsiveness = kwargs.get('responsiveness', 0.2)
+        device = kwargs.get('device', 'cpu')
+        num_steps_before_ascent = kwargs.get('num_steps_before_ascent', 20)
 
         # GENERAL MODEL ATTRIBUTES
         self.num_agents = num_voters + initial_num_candidates
@@ -122,6 +129,9 @@ class ElectionSystem(mesa.Model):
             stage_list=['voters_move'],
             shuffle_between_stages=True
         )
+        self.device = device
+        self.num_steps_before_ascent = num_steps_before_ascent
+        self.variance = 0
 
         # for adding candidates in later on
         self.candidate_index = num_voters
@@ -136,7 +146,6 @@ class ElectionSystem(mesa.Model):
 
         # attraction-repulsion parameters
         self.exposure = exposure
-        self.responsiveness = responsiveness
 
         # candidate ascent parameters
         self.beta = beta
@@ -210,6 +219,7 @@ class ElectionSystem(mesa.Model):
         self.datacollector = mesa.datacollection.DataCollector(
             model_reporters = {
                 'winner': 'winner.unique_id',
+                'variance': 'variance'
             },
             agent_reporters = self.get_agent_reporter_dict()
         )
@@ -222,9 +232,9 @@ class ElectionSystem(mesa.Model):
         agent_reporters = {
             'voted_for': 'voted_for',
             'num_votes': lambda a: a.num_votes if a.type == 'candidate' else None,
-            'is_winner': lambda a: a.is_winner if a.type == 'candidate' else None,
+            'is_winner': lambda a: a.is_winner if a.type == 'candidate' else False,
             'num_wins': lambda a: a.num_wins if a.type == 'candidate' else None,
-            'threshold': lambda a: a.threshold if a.type == 'candidate' else None,
+            'threshold': 'threshold',
             'exit_probability': lambda a: a.exit_probability if a.type == 'candidate' else None,
             'type': 'type',
         }
@@ -244,8 +254,9 @@ class ElectionSystem(mesa.Model):
         # move voters
         self.schedule.step()
 
-        # candidates move strategically
-        self.candidate_ascent()
+        # candidates move strategically on specified rounds
+        if self.schedule.steps % self.num_steps_before_ascent == 0:
+            self.candidate_ascent()
 
         # election round processes
         if self.schedule.steps % self.num_rounds_before_election == 0:
@@ -265,6 +276,12 @@ class ElectionSystem(mesa.Model):
 
             # add and remove candidates
             self.change_candidates(winner)
+
+        # compute variance for round
+        all_agents = self.agent_set[Voter] + self.agent_set[Candidate]
+        all_opinions = [agent.opinion[0] for agent in all_agents]
+        variance = np.array(all_opinions).var()
+        self.variance = variance
 
         # collect data for round
         self.datacollector.collect(self)
@@ -328,15 +345,15 @@ class ElectionSystem(mesa.Model):
         voters = self.agent_set[Voter]
 
         # tensor of each voters probaility of voting for each candidate
-        voter_opinions = torch.stack([torch.tensor(v.opinion) for v in voters])
-        candidate_opinions = torch.stack([torch.tensor(c.opinion) for c in candidates])
+        voter_opinions = torch.stack([torch.tensor(v.opinion) for v in voters]).to(self.device)
+        candidate_opinions = torch.stack([torch.tensor(c.opinion) for c in candidates]).to(self.device)
 
         # sample voter probabilities
         voter_probabilities = self.vote_probabilities(voter_opinions, candidate_opinions)
         ballots = []
         for voter, prob in zip(voters, voter_probabilities):
             # prob[torch.isnan(prob)] = 0 # replace NaN values with 0
-            vote = np.random.choice(candidates, size=1, p=prob)[0]
+            vote = np.random.choice(candidates, size=1, p=prob.cpu())[0]
             ballots.append(vote)
             voter.voted_for = vote.unique_id
         
@@ -370,8 +387,8 @@ class ElectionSystem(mesa.Model):
         voters = self.agent_set[Voter].copy()
 
         # tensor of each voters probaility of voting for each candidate
-        voter_opinions = torch.stack([torch.tensor(v.opinion) for v in voters])
-        candidate_opinions = torch.stack([torch.tensor(c.opinion) for c in candidates])
+        voter_opinions = torch.stack([torch.tensor(v.opinion) for v in voters]).to(self.device)
+        candidate_opinions = torch.stack([torch.tensor(c.opinion) for c in candidates]).to(self.device)
 
         # sample voter probabilities
         voter_probabilities = self.vote_probabilities(voter_opinions, candidate_opinions)
@@ -427,8 +444,8 @@ class ElectionSystem(mesa.Model):
         voters = self.agent_set[Voter]
 
         # tensor of each voters probaility of voting for each candidate
-        voter_opinions = torch.stack([torch.tensor(v.opinion) for v in voters])
-        candidate_opinions = torch.stack([torch.tensor(c.opinion) for c in candidates])
+        voter_opinions = torch.stack([torch.tensor(v.opinion) for v in voters]).to(self.device)
+        candidate_opinions = torch.stack([torch.tensor(c.opinion) for c in candidates]).to(self.device)
 
         # sample voter probabilities
         voter_probabilities = self.vote_probabilities(voter_opinions, candidate_opinions)
@@ -510,10 +527,10 @@ class ElectionSystem(mesa.Model):
         d = np.linalg.norm(a1.opinion - a2.opinion)
         interaction_probability = (1/2)**(d / self.exposure)
         if self.random.random() < interaction_probability:
-            if d < threshold:
-                a1.opinion = self.bounded_update(a1.opinion + ((a2.opinion - a1.opinion) * self.responsiveness))
+            if d <= threshold:
+                a1.opinion = self.bounded_update((a1.opinion + ((a2.opinion - a1.opinion) * self.mu)) + (self.voter_noise_factor * np.random.normal(0, 1, size=self.num_opinions)))
             else:
-                a1.opinion = self.bounded_update(a1.opinion - ((a2.opinion - a1.opinion) * self.responsiveness))
+                a1.opinion = self.bounded_update((a1.opinion - ((a2.opinion - a1.opinion) * self.mu)) + (self.voter_noise_factor * np.random.normal(0, 1, size=self.num_opinions)))
 
 
 
@@ -540,9 +557,9 @@ class ElectionSystem(mesa.Model):
         """
 
         # get tensors of voters and candidate opinions
-        voter_opinions = torch.stack([torch.tensor(v.opinion) for v in self.agent_set[Voter]])
+        voter_opinions = torch.stack([torch.tensor(v.opinion) for v in self.agent_set[Voter]]).to(self.device)
         voter_opinions.requires_grad_(True)
-        candidate_opinions = torch.stack([torch.tensor(c.opinion) for c in self.agent_set[Candidate]])
+        candidate_opinions = torch.stack([torch.tensor(c.opinion) for c in self.agent_set[Candidate]]).to(self.device)
         candidates = [c for c in self.agent_set[Candidate]] # list of candidates in same order as gradients
         candidate_opinions.requires_grad_(True)
         
@@ -551,7 +568,7 @@ class ElectionSystem(mesa.Model):
         # update candidates positions with gradients
         for candidate_index, candidate in zip(range(len(self.agent_set[Candidate])), candidates):
             expected_votes[candidate_index].backward(retain_graph=True)
-            gains = candidate_opinions.grad
+            gains = candidate_opinions.grad.cpu()
             gain = np.array(gains[candidate_index])
 
             # check if gradient is NaN
