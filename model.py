@@ -20,12 +20,6 @@ class Voter(mesa.Agent):
         self.candidate_interaction_fn = candidate_interaction_fn
         self.get_interaction_agents = self.model.get_random_agent_set
 
-        # these are canddiate attributes that need to be set so model is pickleable
-        self.num_votes = None
-        self.is_winner = None
-        self.num_wins = None
-        self.exit_probability = None
-
 
     def voters_move(self):
         """
