@@ -100,7 +100,6 @@ class ElectionSystem(mesa.Model):
         second_choice_weight_factor = kwargs.get('second_choice_weight_factor', 0.1)
         voter_noise_factor = kwargs.get('voter_noise_factor', 0)
         exposure = kwargs.get('exposure', 0.5)
-        responsiveness = kwargs.get('responsiveness', 0.2)
 
         # GENERAL MODEL ATTRIBUTES
         self.num_agents = num_voters + initial_num_candidates
@@ -136,7 +135,6 @@ class ElectionSystem(mesa.Model):
 
         # attraction-repulsion parameters
         self.exposure = exposure
-        self.responsiveness = responsiveness
 
         # candidate ascent parameters
         self.beta = beta
@@ -510,10 +508,10 @@ class ElectionSystem(mesa.Model):
         d = np.linalg.norm(a1.opinion - a2.opinion)
         interaction_probability = (1/2)**(d / self.exposure)
         if self.random.random() < interaction_probability:
-            if d < threshold:
-                a1.opinion = self.bounded_update(a1.opinion + ((a2.opinion - a1.opinion) * self.responsiveness))
+            if d <= threshold:
+                a1.opinion = self.bounded_update((a1.opinion + ((a2.opinion - a1.opinion) * self.__module__)) + (self.voter_noise_factor * np.random.normal(0, 1, size=self.num_opinions)))
             else:
-                a1.opinion = self.bounded_update(a1.opinion - ((a2.opinion - a1.opinion) * self.responsiveness))
+                a1.opinion = self.bounded_update((a1.opinion - ((a2.opinion - a1.opinion) * self.mu)) + (self.voter_noise_factor * np.random.normal(0, 1, size=self.num_opinions)))
 
 
 
